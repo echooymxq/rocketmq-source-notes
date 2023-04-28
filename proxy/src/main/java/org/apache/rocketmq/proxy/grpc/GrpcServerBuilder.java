@@ -155,6 +155,7 @@ public class GrpcServerBuilder {
         }
     }
 
+    // 配置gRPC的认证拦截器
     public GrpcServerBuilder configInterceptor() {
         // grpc interceptors, including acl, logging etc.
         List<AccessValidator> accessValidators = ServiceProvider.load(AccessValidator.class);

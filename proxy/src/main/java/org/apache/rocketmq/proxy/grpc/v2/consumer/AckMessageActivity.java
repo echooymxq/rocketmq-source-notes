@@ -95,10 +95,20 @@ public class AckMessageActivity extends AbstractMessingActivity {
         CompletableFuture<AckMessageResultEntry> future = new CompletableFuture<>();
 
         try {
+            // ACK消息句柄
             String handleString = ackMessageEntry.getReceiptHandle();
 
             String group = GrpcConverter.getInstance().wrapResourceWithNamespace(request.getGroup());
-            MessageReceiptHandle messageReceiptHandle = receiptHandleProcessor.removeReceiptHandle(grpcChannelManager.getChannel(ctx.getClientID()), group, ackMessageEntry.getMessageId(), ackMessageEntry.getReceiptHandle());
+
+            // 获取消息ACK句柄，这个句柄是在内存的，所以存在一个问题？如果这个ACK发到另一个Proxy怎么办？
+            // 所以客户端做了限制，ACK发往的EndPoint是Receive到消息的Endpoint.
+            // 应该不是这个原因。
+            // 上面已经传递了ReceiptHandle了，为什么还需要呢？
+            MessageReceiptHandle messageReceiptHandle = receiptHandleProcessor.removeReceiptHandle(grpcChannelManager.getChannel(ctx.getClientID()),
+                group,
+                ackMessageEntry.getMessageId(),
+                ackMessageEntry.getReceiptHandle()
+            );
             if (messageReceiptHandle != null) {
                 handleString = messageReceiptHandle.getReceiptHandleStr();
             }

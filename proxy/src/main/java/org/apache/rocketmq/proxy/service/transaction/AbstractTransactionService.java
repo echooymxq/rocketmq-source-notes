@@ -40,6 +40,7 @@ public abstract class AbstractTransactionService implements TransactionService, 
         if (StringUtils.isBlank(brokerName)) {
             return null;
         }
+        // 事务数据
         TransactionData transactionData = new TransactionData(
             brokerName,
             tranStateTableOffset, commitLogOffset, transactionId,

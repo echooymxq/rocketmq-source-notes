@@ -144,7 +144,7 @@ public class PopCheckPoint implements Comparable<PopCheckPoint> {
     }
 
     public int indexOfAck(long ackOffset) {
-        if (ackOffset < startOffset) {
+        if (ackOffset < startOffset) { // startOffset是PoPOffset起始位置
             return -1;
         }
 

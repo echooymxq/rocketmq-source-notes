@@ -24,6 +24,8 @@ public class Slot {
     public final int num;
     public final int magic; //no use now, just keep it
 
+    public static final Slot EMPTY = new Slot(-1, -1, -1);
+
     public Slot(long timeMs, long firstPos, long lastPos) {
         this.timeMs = timeMs;
         this.firstPos = firstPos;
@@ -38,5 +40,6 @@ public class Slot {
         this.lastPos = lastPos;
         this.num = num;
         this.magic = magic;
+//        System.out.printf("创建Slot timeMs[%s] firstPos[%s] lastPos[%s] num[%s] magic[%s] %n", timeMs, firstPos, lastPos, num, magic);
     }
 }

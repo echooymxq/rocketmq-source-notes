@@ -48,6 +48,7 @@ public class PopRequest {
     }
 
     public boolean isTimeout() {
+        // 这里-50是想让它提前唤醒，然后最后再去pop一次。
         return System.currentTimeMillis() > (expired - 50);
     }
 

@@ -152,6 +152,7 @@ public class ConsumerManager {
         return removed;
     }
 
+    // 为没有心跳的消费者补偿消费者信息
     // compensate consumer info for consumer without heartbeat
     public void compensateBasicConsumerInfo(String group, ConsumeType consumeType, MessageModel messageModel) {
         ConsumerGroupInfo consumerGroupInfo = consumerCompensationTable.computeIfAbsent(group, ConsumerGroupInfo::new);
@@ -159,6 +160,7 @@ public class ConsumerManager {
         consumerGroupInfo.setMessageModel(messageModel);
     }
 
+    // 补偿订阅者信息
     // compensate subscription for pull consumer and consumer via proxy
     public void compensateSubscribeData(String group, String topic, SubscriptionData subscriptionData) {
         ConsumerGroupInfo consumerGroupInfo = consumerCompensationTable.computeIfAbsent(group, ConsumerGroupInfo::new);

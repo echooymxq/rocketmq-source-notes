@@ -76,6 +76,7 @@ public class SendMessageActivity extends AbstractRemotingActivity {
             }
         }
         if (!NamespaceUtil.isRetryTopic(topic) && !NamespaceUtil.isDLQTopic(topic)) {
+            // 如果是事务消息，则添加事务订阅
             if (TopicMessageType.TRANSACTION.equals(messageType)) {
                 messagingProcessor.addTransactionSubscription(context, requestHeader.getProducerGroup(), requestHeader.getTopic());
             }

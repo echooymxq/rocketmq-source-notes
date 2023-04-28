@@ -209,6 +209,7 @@ public class EscapeBridge {
         BrokerController masterBroker = this.brokerController.peekMasterBroker();
         if (masterBroker != null) {
             return masterBroker.getMessageStore().putMessage(messageExt);
+            // 这个4.x是不支持的，从挂了的时候，发送到另外的从节点
         } else if (this.brokerController.getBrokerConfig().isEnableSlaveActingMaster()
             && this.brokerController.getBrokerConfig().isEnableRemoteEscape()) {
             try {
@@ -270,6 +271,7 @@ public class EscapeBridge {
     public CompletableFuture<Pair<GetMessageStatus, MessageExt>> getMessageAsync(String topic, long offset, int queueId, String brokerName, boolean deCompressBody) {
         MessageStore messageStore = brokerController.getMessageStoreByBrokerName(brokerName);
         if (messageStore != null) {
+            // 从本地Broker获取消息
             return messageStore.getMessageAsync(innerConsumerGroupName, topic, queueId, offset, 1, null)
                 .thenApply(result -> {
                     if (result == null) {

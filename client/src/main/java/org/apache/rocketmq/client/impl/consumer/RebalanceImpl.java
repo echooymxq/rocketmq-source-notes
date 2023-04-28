@@ -242,8 +242,10 @@ public abstract class RebalanceImpl {
                 final String topic = entry.getKey();
                 try {
                     if (!clientRebalance(topic) && tryQueryAssignment(topic)) {
+                        // Rebalance By Broker
                         balanced = this.getRebalanceResultFromBroker(topic, isOrder);
                     } else {
+                        // Rebalance By Client
                         balanced = this.rebalanceByTopic(topic, isOrder);
                     }
                 } catch (Throwable e) {
@@ -375,6 +377,7 @@ public abstract class RebalanceImpl {
         return balanced;
     }
 
+    //POP模式 从Broker中获取rebalance结果
     private boolean getRebalanceResultFromBroker(final String topic, final boolean isOrder) {
         String strategyName = this.allocateMessageQueueStrategy.getName();
         Set<MessageQueueAssignment> messageQueueAssignments;
@@ -397,6 +400,7 @@ public abstract class RebalanceImpl {
             }
         }
         Set<MessageQueue> mqAll = null;
+        // 更新分配的队列，顺便发起POP请求
         boolean changed = this.updateMessageQueueAssignment(topic, messageQueueAssignments, isOrder);
         if (changed) {
             log.info("broker rebalanced result changed. allocateMessageQueueStrategyName={}, group={}, topic={}, clientId={}, assignmentSet={}",

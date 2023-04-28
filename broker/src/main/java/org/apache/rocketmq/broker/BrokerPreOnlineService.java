@@ -68,6 +68,7 @@ public class BrokerPreOnlineService extends ServiceThread {
                 break;
             }
             try {
+                // Master预上线
                 boolean isSuccess = this.prepareForBrokerOnline();
                 if (!isSuccess) {
                     this.waitForRunning(1000);
@@ -121,6 +122,7 @@ public class BrokerPreOnlineService extends ServiceThread {
             String brokerAddrToWait = brokerMemberGroup.getBrokerAddrs().get(brokerIdList.get(waitBrokerIndex));
 
             try {
+                // 向备节点发送自己的状态信息和地址
                 this.brokerController.getBrokerOuterAPI().
                     sendBrokerHaInfo(brokerAddrToWait, this.brokerController.getHAServerAddr(),
                         this.brokerController.getMessageStore().getBrokerInitMaxOffset(), this.brokerController.getBrokerAddr());
@@ -129,6 +131,7 @@ public class BrokerPreOnlineService extends ServiceThread {
                 return false;
             }
 
+            // 等待备向主建立HA连接，完成握手
             CompletableFuture<Boolean> haHandshakeFuture = waitForHaHandshakeComplete(brokerAddrToWait)
                 .thenApply(result -> futureWaitAction(result, brokerMemberGroup));
 
@@ -141,6 +144,7 @@ public class BrokerPreOnlineService extends ServiceThread {
                 return false;
             }
 
+            // 反向获取备的元数据，包括消费位点、定时消息进度，根据版本号决定是否更新
             if (syncMetadataReverse(brokerAddrToWait)) {
                 waitBrokerIndex++;
             } else {
@@ -161,6 +165,7 @@ public class BrokerPreOnlineService extends ServiceThread {
 
             TimerCheckpoint timerCheckpoint = this.brokerController.getBrokerOuterAPI().getTimerCheckPoint(brokerAddr);
 
+            // 备节点的消费位点的版本 > 当前节点的消费位点版本
             if (null != consumerOffsetSerializeWrapper && brokerController.getConsumerOffsetManager().getDataVersion().compare(consumerOffsetSerializeWrapper.getDataVersion()) <= 0) {
                 LOGGER.info("{}'s consumerOffset data version is larger than master broker, {}'s consumerOffset will be used.", brokerAddr, brokerAddr);
                 this.brokerController.getConsumerOffsetManager().getOffsetTable()
@@ -169,6 +174,7 @@ public class BrokerPreOnlineService extends ServiceThread {
                 this.brokerController.getConsumerOffsetManager().persist();
             }
 
+            // 延时消息位点
             if (null != delayOffset && brokerController.getScheduleMessageService().getDataVersion().compare(delayOffsetSerializeWrapper.getDataVersion()) <= 0) {
                 LOGGER.info("{}'s scheduleMessageService data version is larger than master broker, {}'s delayOffset will be used.", brokerAddr, brokerAddr);
                 String fileName =
@@ -182,6 +188,7 @@ public class BrokerPreOnlineService extends ServiceThread {
                 }
             }
 
+            // CheckPoint
             if (null != this.brokerController.getTimerCheckpoint() && this.brokerController.getTimerCheckpoint().getDataVersion().compare(timerCheckpoint.getDataVersion()) <= 0) {
                 LOGGER.info("{}'s timerCheckpoint data version is larger than master broker, {}'s timerCheckpoint will be used.", brokerAddr, brokerAddr);
                 this.brokerController.getTimerCheckpoint().setLastReadTimeMs(timerCheckpoint.getLastReadTimeMs());
@@ -260,8 +267,10 @@ public class BrokerPreOnlineService extends ServiceThread {
         if (brokerMemberGroup != null && !brokerMemberGroup.getBrokerAddrs().isEmpty()) {
             long minBrokerId = getMinBrokerId(brokerMemberGroup.getBrokerAddrs());
 
+            // 如果当前是Master，则进行Master的预上线
             if (this.brokerController.getBrokerConfig().getBrokerId() == MixAll.MASTER_ID) {
                 return prepareForMasterOnline(brokerMemberGroup);
+                // 如果组内的最小BrokerId为Master,表示Master已经上线，准备Slave的上线
             } else if (minBrokerId == MixAll.MASTER_ID) {
                 return prepareForSlaveOnline(brokerMemberGroup);
             } else {

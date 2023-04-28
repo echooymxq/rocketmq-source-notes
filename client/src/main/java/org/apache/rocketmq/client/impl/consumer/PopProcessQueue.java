@@ -49,6 +49,10 @@ public class PopProcessQueue {
         return this.waitAckCounter.getAndDecrement();
     }
 
+    public int ack(final int ack) {
+        return this.waitAckCounter.getAndAdd(-ack);
+    }
+
     public void decFoundMsg(int count) {
         this.waitAckCounter.addAndGet(count);
     }

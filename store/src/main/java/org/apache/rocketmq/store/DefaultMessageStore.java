@@ -579,11 +579,16 @@ public class DefaultMessageStore implements MessageStore {
 
             if (null == result || !result.isOk()) {
                 this.storeStatsService.getPutMessageFailedTimes().add(1);
+            } else {
+                POP_LOGGER.info("=====生产消息Topic[{}] queueId[{}] queueOffset[{}]", msg.getTopic(), msg.getQueueId(), msg.getQueueOffset());
             }
         });
 
         return putResultFuture;
     }
+
+    private static final Logger POP_LOGGER =
+        LoggerFactory.getLogger(LoggerName.ROCKETMQ_POP_LOGGER_NAME);
 
     @Override
     public CompletableFuture<PutMessageResult> asyncPutMessages(MessageExtBatch messageExtBatch) {
@@ -2181,8 +2186,8 @@ public class DefaultMessageStore implements MessageStore {
 
         public void run() {
             try {
-                this.deleteExpiredFiles();
-                this.reDeleteHangedFile();
+//                this.deleteExpiredFiles();
+//                this.reDeleteHangedFile();
             } catch (Throwable e) {
                 DefaultMessageStore.LOGGER.warn(this.getServiceName() + " service has exception. ", e);
             }

@@ -596,6 +596,7 @@ public class PlainPermissionManager {
 
     public void validate(PlainAccessResource plainAccessResource) {
 
+        // 检查IP地址白名单
         // Check the global white remote addr
         for (RemoteAddressStrategy remoteAddressStrategy : globalWhiteRemoteAddressStrategy) {
             if (remoteAddressStrategy.match(plainAccessResource)) {

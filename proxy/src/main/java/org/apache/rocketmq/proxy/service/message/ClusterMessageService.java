@@ -131,7 +131,7 @@ public class ClusterMessageService implements MessageService {
     public CompletableFuture<AckResult> ackMessage(ProxyContext ctx, ReceiptHandle handle, String messageId,
         AckMessageRequestHeader requestHeader, long timeoutMillis) {
         return this.mqClientAPIFactory.getClient().ackMessageAsync(
-            this.resolveBrokerAddrInReceiptHandle(handle),
+            this.resolveBrokerAddrInReceiptHandle(handle), // 从句柄中提取brokerName，再获取brokerAddr.
             requestHeader,
             timeoutMillis
         );

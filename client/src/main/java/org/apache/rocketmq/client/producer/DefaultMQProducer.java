@@ -93,7 +93,7 @@ public class DefaultMQProducer extends ClientConfig implements MQProducer {
     /**
      * Number of queues to create per default topic.
      */
-    private volatile int defaultTopicQueueNums = 4;
+    private volatile int defaultTopicQueueNums = 1;
 
     /**
      * Timeout for sending messages.

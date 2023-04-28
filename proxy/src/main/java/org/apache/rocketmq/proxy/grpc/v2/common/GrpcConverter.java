@@ -222,6 +222,7 @@ public class GrpcConverter {
             systemPropertiesBuilder.setMessageGroup(shardingKey);
         }
 
+        // 拉取消息时就返回消息句柄.
         // receipt_handle && invisible_period
         String handle = messageExt.getProperty(MessageConst.PROPERTY_POP_CK);
         if (handle != null) {

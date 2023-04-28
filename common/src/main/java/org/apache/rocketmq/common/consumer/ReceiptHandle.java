@@ -38,6 +38,7 @@ public class ReceiptHandle {
     private final long commitLogOffset;
     private final String receiptHandle;
 
+    // ACK消息句柄 startOffset retrieveTime invisibleTime reviveQueueId topicType brokerName queueId offset commitLogOffset
     public String encode() {
         return startOffset + SEPARATOR + retrieveTime + SEPARATOR + invisibleTime + SEPARATOR + reviveQueueId
             + SEPARATOR + topicType + SEPARATOR + brokerName + SEPARATOR + queueId + SEPARATOR + offset + SEPARATOR

@@ -392,6 +392,7 @@ public class BrokerController {
 
         this.topicRouteInfoManager = new TopicRouteInfoManager(this);
 
+        // 是否启用slaveActMaster 和预上线
         if (this.brokerConfig.isEnableSlaveActingMaster() && !this.brokerConfig.isSkipPreOnline()) {
             this.brokerPreOnlineService = new BrokerPreOnlineService(this);
         }
@@ -1566,6 +1567,7 @@ public class BrokerController {
 
         startBasicService();
 
+        // 等待Broker注册完毕,不再隔离之后，然后再改变状态。
         if (!isIsolated && !this.messageStoreConfig.isEnableDLegerCommitLog() && !this.messageStoreConfig.isDuplicationEnable()) {
             changeSpecialServiceStatus(this.brokerConfig.getBrokerId() == MixAll.MASTER_ID);
             this.registerBrokerAll(true, false, true);
@@ -1910,6 +1912,7 @@ public class BrokerController {
         this.minBrokerIdInGroup = minBrokerId;
         this.minBrokerAddrInGroup = minBrokerAddr;
 
+        // 如果当前的BrokerId是组内最小的BrokerId，则启动相关服务
         this.changeSpecialServiceStatus(this.brokerConfig.getBrokerId() == this.minBrokerIdInGroup);
 
         if (offlineBrokerAddr != null && offlineBrokerAddr.equals(this.slaveSynchronize.getMasterAddr())) {

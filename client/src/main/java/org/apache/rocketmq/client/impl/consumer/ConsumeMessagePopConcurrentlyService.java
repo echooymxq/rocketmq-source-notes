@@ -16,8 +16,10 @@
  */
 package org.apache.rocketmq.client.impl.consumer;
 
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.concurrent.BlockingQueue;
@@ -201,6 +203,7 @@ public class ConsumeMessagePopConcurrentlyService implements ConsumeMessageServi
                 try {
                     this.consumeExecutor.submit(consumeRequest);
                 } catch (RejectedExecutionException e) {
+                    e.printStackTrace();
                     for (; total < msgs.size(); total++) {
                         msgThis.add(msgs.get(total));
                     }
@@ -247,6 +250,12 @@ public class ConsumeMessagePopConcurrentlyService implements ConsumeMessageServi
             this.defaultMQPushConsumerImpl.ackAsync(consumeRequest.getMsgs().get(i), consumerGroup);
             consumeRequest.getPopProcessQueue().ack();
         }
+//        // 重构之后
+//        if (ackIndex == consumeRequest.getMsgs().size() - 1) {
+//            this.defaultMQPushConsumerImpl.ackAsync(consumeRequest.getMsgs().get(i), consumerGroup);
+//            consumeRequest.getPopProcessQueue().ack(consumeRequest.getMsgs().size());
+//        }
+
 
         //consume later if consume fail
         for (int i = ackIndex + 1; i < consumeRequest.getMsgs().size(); i++) {
@@ -360,6 +369,7 @@ public class ConsumeMessagePopConcurrentlyService implements ConsumeMessageServi
                 popTime = ExtraInfoUtil.getPopTime(extraInfoStrs);
                 invisibleTime = ExtraInfoUtil.getInvisibleTime(extraInfoStrs);
             } catch (Throwable t) {
+                t.printStackTrace();
                 log.error("parse extra info error. msg:" + msgs.get(0), t);
             }
         }
@@ -423,6 +433,7 @@ public class ConsumeMessagePopConcurrentlyService implements ConsumeMessageServi
                 }
                 status = listener.consumeMessage(Collections.unmodifiableList(msgs), context);
             } catch (Throwable e) {
+                e.printStackTrace();
                 log.warn("consumeMessage exception: {} Group: {} Msgs: {} MQ: {}",
                     UtilAll.exceptionSimpleDesc(e),
                     ConsumeMessagePopConcurrentlyService.this.consumerGroup,

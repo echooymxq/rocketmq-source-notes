@@ -18,12 +18,15 @@ package org.apache.rocketmq.broker.processor;
 
 import com.alibaba.fastjson.JSON;
 import com.googlecode.concurrentlinkedhashmap.ConcurrentLinkedHashMap;
+import com.sun.org.apache.bcel.internal.generic.POP;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.FileRegion;
 import io.opentelemetry.api.common.Attributes;
 import java.nio.ByteBuffer;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map.Entry;
@@ -94,6 +97,7 @@ public class PopMessageProcessor implements NettyRequestProcessor {
         LoggerFactory.getLogger(LoggerName.ROCKETMQ_POP_LOGGER_NAME);
     private final BrokerController brokerController;
     private final Random random = new Random(System.currentTimeMillis());
+    // rmq_sys_REVIVE_LOG_BrokerCluster
     String reviveTopic;
     private static final String BORN_TIME = "bornTime";
 
@@ -112,6 +116,7 @@ public class PopMessageProcessor implements NettyRequestProcessor {
 
     public PopMessageProcessor(final BrokerController brokerController) {
         this.brokerController = brokerController;
+        // rmq_sys_REVIVE_LOG_BrokerCluster
         this.reviveTopic = PopAckConstants.buildClusterReviveTopic(this.brokerController.getBrokerConfig().getBrokerClusterName());
         // 100000 topic default,  100000 lru topic + cid + qid
         this.topicCidMap = new ConcurrentHashMap<>(this.brokerController.getBrokerConfig().getPopPollingMapSize());
@@ -203,13 +208,16 @@ public class PopMessageProcessor implements NettyRequestProcessor {
         }
     }
 
+    // 通知Topic有消息到来
     public boolean notifyMessageArriving(final String topic, final String cid, final int queueId) {
+        // 有长轮询的POP请求
         ConcurrentSkipListSet<PopRequest> remotingCommands = pollingMap.get(KeyBuilder.buildPollingKey(topic, cid, queueId));
         if (remotingCommands == null || remotingCommands.isEmpty()) {
             return false;
         }
         PopRequest popRequest = remotingCommands.pollFirst();
         //clean inactive channel
+        // 如果对应的POP请求的channel不可用了
         while (popRequest != null && !popRequest.getChannel().isActive()) {
             totalPollingNum.decrementAndGet();
             popRequest = remotingCommands.pollFirst();
@@ -397,8 +405,9 @@ public class PopMessageProcessor implements NettyRequestProcessor {
         int randomQ = random.nextInt(100);
         int reviveQid;
         if (requestHeader.isOrder()) {
-            reviveQid = KeyBuilder.POP_ORDER_REVIVE_QUEUE;
+            reviveQid = KeyBuilder.POP_ORDER_REVIVE_QUEUE; // 顺序消息，重放队列ID
         } else {
+            // 将这批消息随机分配Revive队列ID
             reviveQid = (int) Math.abs(ckMessageNumber.getAndIncrement() % this.brokerController.getBrokerConfig().getReviveQueueNum());
         }
 
@@ -407,13 +416,16 @@ public class PopMessageProcessor implements NettyRequestProcessor {
         ExpressionMessageFilter finalMessageFilter = messageFilter;
         StringBuilder finalOrderCountInfo = orderCountInfo;
 
+        // 如果能被 5 整除，则先拉取重试Topic
         boolean needRetry = randomQ % 5 == 0;
         long popTime = System.currentTimeMillis();
         CompletableFuture<Long> getMessageFuture = CompletableFuture.completedFuture(0L);
         if (needRetry && !requestHeader.isOrder()) {
+            // %RETRY%Consumer_Group_TopicTest
             TopicConfig retryTopicConfig =
                 this.brokerController.getTopicConfigManager().selectTopicConfig(KeyBuilder.buildPopRetryTopic(requestHeader.getTopic(), requestHeader.getConsumerGroup()));
             if (retryTopicConfig != null) {
+                // 从重试Topic的每个队列中POP消息
                 for (int i = 0; i < retryTopicConfig.getReadQueueNums(); i++) {
                     int queueId = (randomQ + i) % retryTopicConfig.getReadQueueNums();
                     getMessageFuture = getMessageFuture.thenCompose(restNum -> popMsgFromQueue(true, getMessageResult, requestHeader, queueId, restNum, reviveQid, channel, popTime, finalMessageFilter,
@@ -421,6 +433,7 @@ public class PopMessageProcessor implements NettyRequestProcessor {
                 }
             }
         }
+        // 如果请求的队列为-1，表示读取所有的队列
         if (requestHeader.getQueueId() < 0) {
             // read all queue
             for (int i = 0; i < topicConfig.getReadQueueNums(); i++) {
@@ -429,11 +442,12 @@ public class PopMessageProcessor implements NettyRequestProcessor {
                     startOffsetInfo, msgOffsetInfo, finalOrderCountInfo));
             }
         } else {
+            // 从请求头中得到需要POP的队列
             int queueId = requestHeader.getQueueId();
             getMessageFuture = getMessageFuture.thenCompose(restNum -> popMsgFromQueue(false, getMessageResult, requestHeader, queueId, restNum, reviveQid, channel, popTime, finalMessageFilter,
                 startOffsetInfo, msgOffsetInfo, finalOrderCountInfo));
         }
-        // if not full , fetch retry again
+        // 如果POP的消息没有达到最大的消息请求数量，且之前没有拉取过重试消息，则Pop重试Topic所有队列的消息（期望填充满Pop请求要求的数量）
         if (!needRetry && getMessageResult.getMessageMapedList().size() < requestHeader.getMaxMsgNums() && !requestHeader.isOrder()) {
             TopicConfig retryTopicConfig =
                 this.brokerController.getTopicConfigManager().selectTopicConfig(KeyBuilder.buildPopRetryTopic(requestHeader.getTopic(), requestHeader.getConsumerGroup()));
@@ -457,6 +471,7 @@ public class PopMessageProcessor implements NettyRequestProcessor {
                         requestHeader.getQueueId());
                 }
             } else {
+                // 判断是否有Pop到消息，如果有则传输回客户端，如果没有则挂起轮询，直到超过请求的timeout参数指定的时间
                 int pollingResult = polling(channel, request, requestHeader);
                 if (POLLING_SUC == pollingResult) {
                     return null;
@@ -471,6 +486,10 @@ public class PopMessageProcessor implements NettyRequestProcessor {
             responseHeader.setPopTime(popTime);
             responseHeader.setReviveQid(reviveQid);
             responseHeader.setRestNum(restNum);
+            // StartOffsetInfo有三个字段，普通Topic还是重试Topic 空格 队列ID 空格 POPOffset
+            // 如果是从多个队列中拉取的则以;进行分割
+            // startOffsetInfo:0 0 11
+            // msgOffsetInfo:0 0 11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42
             responseHeader.setStartOffsetInfo(startOffsetInfo.toString());
             responseHeader.setMsgOffsetInfo(msgOffsetInfo.toString());
             if (requestHeader.isOrder() && finalOrderCountInfo != null) {
@@ -529,12 +548,14 @@ public class PopMessageProcessor implements NettyRequestProcessor {
         StringBuilder msgOffsetInfo, StringBuilder orderCountInfo) {
         String topic = isRetry ? KeyBuilder.buildPopRetryTopic(requestHeader.getTopic(),
             requestHeader.getConsumerGroup()) : requestHeader.getTopic();
-        String lockKey =
-            topic + PopAckConstants.SPLIT + requestHeader.getConsumerGroup() + PopAckConstants.SPLIT + queueId;
+        // topicName@consumerGroup@queueId，锁住Topic+消费组+队列ID
+        String lockKey = topic + PopAckConstants.SPLIT + requestHeader.getConsumerGroup() + PopAckConstants.SPLIT + queueId;
         boolean isOrder = requestHeader.isOrder();
+        // 获取PoPOffset，如果是之前POP过的消息，由于POP过，现在是POP不到的
         long offset = getPopOffset(topic, requestHeader.getConsumerGroup(), queueId, requestHeader.getInitMode(),
             false, lockKey, false);
         CompletableFuture<Long> future = new CompletableFuture<>();
+        // Queue 上加锁，保证同一时刻只有一个消费者可以拉取同一个 Queue 的消息
         if (!queueLockManager.tryLock(lockKey)) {
             restNum = this.brokerController.getMessageStore().getMaxOffsetInQueue(topic, queueId) - offset + restNum;
             future.complete(restNum);
@@ -559,6 +580,7 @@ public class PopMessageProcessor implements NettyRequestProcessor {
                 );
             }
 
+            // 已经拉取到足够的消息
             if (getMessageResult.getMessageMapedList().size() >= requestHeader.getMaxMsgNums()) {
                 restNum = this.brokerController.getMessageStore().getMaxOffsetInQueue(topic, queueId) - offset + restNum;
                 future.complete(restNum);
@@ -607,7 +629,6 @@ public class PopMessageProcessor implements NettyRequestProcessor {
                         result.getMessageCount());
                     this.brokerController.getBrokerStatsManager().incGroupGetSize(requestHeader.getConsumerGroup(), topic,
                         result.getBufferTotalSize());
-
                     Attributes attributes = BrokerMetricsManager.newAttributesBuilder()
                         .put(LABEL_TOPIC, requestHeader.getTopic())
                         .put(LABEL_CONSUMER_GROUP, requestHeader.getConsumerGroup())
@@ -625,6 +646,7 @@ public class PopMessageProcessor implements NettyRequestProcessor {
                         this.brokerController.getConsumerOffsetManager().commitOffset(channel.remoteAddress().toString(),
                             requestHeader.getConsumerGroup(), topic, queueId, finalOffset);
                     } else {
+                        // POP到消息之后，添加 CheckPoint 到内存，用于等待 ACK
                         appendCheckPoint(requestHeader, topic, reviveQid, queueId, finalOffset, result, popTime, this.brokerController.getBrokerConfig().getBrokerName());
                     }
                     ExtraInfoUtil.buildStartOffsetInfo(startOffsetInfo, isRetry, queueId, finalOffset);
@@ -635,6 +657,7 @@ public class PopMessageProcessor implements NettyRequestProcessor {
                     || GetMessageStatus.MESSAGE_WAS_REMOVING.equals(result.getStatus())
                     || GetMessageStatus.NO_MATCHED_LOGIC_QUEUE.equals(result.getStatus()))
                     && result.getNextBeginOffset() > -1) {
+                    // 没有拉取到消息，添加一个Mock CheckPoint到队列
                     popBufferMergeService.addCkMock(requestHeader.getConsumerGroup(), topic, queueId, finalOffset,
                         requestHeader.getInvisibleTime(), popTime, reviveQid, result.getNextBeginOffset(), brokerController.getBrokerConfig().getBrokerName());
 //                this.brokerController.getConsumerOffsetManager().commitOffset(channel.remoteAddress().toString(), requestHeader.getConsumerGroup(), topic,
@@ -646,8 +669,10 @@ public class PopMessageProcessor implements NettyRequestProcessor {
                 for (SelectMappedBufferResult mapedBuffer : result.getMessageMapedList()) {
                     // We should not recode buffer for normal topic message
                     if (!isRetry) {
+                        // 如果是普通消息，直接返回Buffer
                         getMessageResult.addMessage(mapedBuffer);
                     } else {
+                        // 如果是重试消息，需要重新设置Topic
                         List<MessageExt> messageExtList = MessageDecoder.decodesBatch(mapedBuffer.getByteBuffer(),
                             true, false, true);
                         mapedBuffer.release();
@@ -655,9 +680,11 @@ public class PopMessageProcessor implements NettyRequestProcessor {
                             try {
                                 String ckInfo = ExtraInfoUtil.buildExtraInfo(finalOffset, popTime, requestHeader.getInvisibleTime(),
                                     reviveQid, messageExt.getTopic(), brokerName, messageExt.getQueueId(), messageExt.getQueueOffset());
+                                // 每条消息返回ACK句柄，在服务端生成POP CK
                                 messageExt.getProperties().putIfAbsent(MessageConst.PROPERTY_POP_CK, ckInfo);
 
                                 // Set retry message topic to origin topic and clear message store size to recode
+                                // 具体issue https://github.com/apache/rocketmq/issues/5568
                                 messageExt.setTopic(requestHeader.getTopic());
                                 messageExt.setStoreSize(0);
 
@@ -690,12 +717,16 @@ public class PopMessageProcessor implements NettyRequestProcessor {
     private long getPopOffset(String topic, String group, int queueId, int initMode, boolean init, String lockKey,
         boolean checkResetOffset) {
 
+        // 查询当前队列的消费偏移量
         long offset = this.brokerController.getConsumerOffsetManager().queryOffset(group, topic, queueId);
         if (offset < 0) {
+            // 类似于从最早开始消费还是从最新的开始消费
             if (ConsumeInitMode.MIN == initMode) {
+                // 当前ConsumeQueue的最小位置
                 offset = this.brokerController.getMessageStore().getMinOffsetInQueue(topic, queueId);
             } else {
                 // pop last one,then commit offset.
+                // 当前ConsumeQueue的最后位置
                 offset = this.brokerController.getMessageStore().getMaxOffsetInQueue(topic, queueId) - 1;
                 // max & no consumer offset
                 if (offset < 0) {
@@ -708,6 +739,7 @@ public class PopMessageProcessor implements NettyRequestProcessor {
             }
         }
 
+        // 是否检查重置偏移量
         if (checkResetOffset) {
             Long resetOffset = resetPopOffset(topic, group, queueId);
             if (resetOffset != null) {
@@ -715,6 +747,7 @@ public class PopMessageProcessor implements NettyRequestProcessor {
             }
         }
 
+        // 获取当前POP队列最新的偏移量
         long bufferOffset = this.popBufferMergeService.getLatestOffset(lockKey);
         if (bufferOffset < 0) {
             return offset;
@@ -775,6 +808,7 @@ public class PopMessageProcessor implements NettyRequestProcessor {
             }
         }
         if (queue.add(request)) {
+
             remotingCommand.setSuspended(true);
             totalPollingNum.incrementAndGet();
             if (brokerController.getBrokerConfig().isEnablePopLog()) {
@@ -797,10 +831,10 @@ public class PopMessageProcessor implements NettyRequestProcessor {
         msgInner.setBornTimestamp(System.currentTimeMillis());
         msgInner.setBornHost(this.brokerController.getStoreHost());
         msgInner.setStoreHost(this.brokerController.getStoreHost());
+        // 消息投递时间为(POP时间+消息不可见的时间) - 1S
         msgInner.setDeliverTimeMs(ck.getReviveTime() - PopAckConstants.ackTimeInterval);
         msgInner.getProperties().put(MessageConst.PROPERTY_UNIQ_CLIENT_MESSAGE_ID_KEYIDX, genCkUniqueId(ck));
         msgInner.setPropertiesString(MessageDecoder.messageProperties2String(msgInner.getProperties()));
-
         return msgInner;
     }
 
@@ -810,8 +844,8 @@ public class PopMessageProcessor implements NettyRequestProcessor {
         // add check point msg to revive log
         final PopCheckPoint ck = new PopCheckPoint();
         ck.setBitMap(0);
-        ck.setNum((byte) getMessageTmpResult.getMessageMapedList().size());
-        ck.setPopTime(popTime);
+        ck.setNum((byte) getMessageTmpResult.getMessageMapedList().size()); // POP到的消息数量
+        ck.setPopTime(popTime); // POP的时间
         ck.setInvisibleTime(requestHeader.getInvisibleTime());
         ck.setStartOffset(offset);
         ck.setCId(requestHeader.getConsumerGroup());
@@ -819,20 +853,22 @@ public class PopMessageProcessor implements NettyRequestProcessor {
         ck.setQueueId(queueId);
         ck.setBrokerName(brokerName);
         for (Long msgQueueOffset : getMessageTmpResult.getMessageQueueOffset()) {
-            ck.addDiff((int) (msgQueueOffset - offset));
+            // 添加所有拉取的消息的偏移量与起始偏移量的差值
+            int diff = (int) (msgQueueOffset - offset);
+            ck.addDiff(diff);
         }
 
-        final boolean addBufferSuc = this.popBufferMergeService.addCk(
-            ck, reviveQid, -1, getMessageTmpResult.getNextBeginOffset()
-        );
+        // 将CheckPoint保存到内存中，先放到内存中去匹配
+        final boolean addBufferSuc = this.popBufferMergeService.addCk(ck, reviveQid, -1, getMessageTmpResult.getNextBeginOffset());
 
         if (addBufferSuc) {
             return;
         }
 
-        this.popBufferMergeService.addCkJustOffset(
-            ck, reviveQid, -1, getMessageTmpResult.getNextBeginOffset()
-        );
+        // 放入内存内失败
+        // eg: 内存匹配未开启或者消息的不可见的时间过小
+        // 会先放到Revive Topic后放到内存中
+        this.popBufferMergeService.addCkJustOffset(ck, reviveQid, -1, getMessageTmpResult.getNextBeginOffset());
     }
 
     private Long resetPopOffset(String topic, String group, int queueId) {
@@ -952,18 +988,20 @@ public class PopMessageProcessor implements NettyRequestProcessor {
                     while (pollingMapIterator.hasNext()) {
                         Entry<String, ConcurrentSkipListSet<PopRequest>> entry = pollingMapIterator.next();
                         String key = entry.getKey();
-                        ConcurrentSkipListSet<PopRequest> popQ = entry.getValue();
-                        if (popQ == null) {
+                        ConcurrentSkipListSet<PopRequest> popRequestList = entry.getValue();
+                        if (popRequestList == null) {
                             continue;
                         }
                         PopRequest first;
                         do {
-                            first = popQ.pollFirst();
+                            //  先从队列中移出来
+                            first = popRequestList.pollFirst();
                             if (first == null) {
                                 break;
                             }
                             if (!first.isTimeout()) {
-                                if (popQ.add(first)) {
+                                // 如果还没有超时，就再加进去
+                                if (popRequestList.add(first)) {
                                     break;
                                 } else {
                                     POP_LOGGER.info("polling, add fail again: {}", first);
@@ -977,7 +1015,7 @@ public class PopMessageProcessor implements NettyRequestProcessor {
                         }
                         while (true);
                         if (i >= 100) {
-                            long tmpPollingNum = popQ.size();
+                            long tmpPollingNum = popRequestList.size();
                             tmpTotalPollingNum = tmpTotalPollingNum + tmpPollingNum;
                             if (tmpPollingNum > 100) {
                                 POP_LOGGER.info("polling queue {} , size={} ", key, tmpPollingNum);

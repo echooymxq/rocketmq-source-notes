@@ -106,7 +106,9 @@ public class ConsumerOrderInfoManager extends ConfigManager {
         OrderInfo orderInfo = qs.get(queueId);
 
         if (orderInfo != null) {
+            // 新POP的顺序消息
             OrderInfo newOrderInfo = new OrderInfo(popTime, invisibleTime, msgQueueOffsetList, System.currentTimeMillis(), 0);
+            // 计算消息被消费了多少次
             newOrderInfo.mergeOffsetConsumedCount(orderInfo.offsetList, orderInfo.offsetConsumedCount);
 
             orderInfo = newOrderInfo;
@@ -115,11 +117,12 @@ public class ConsumerOrderInfoManager extends ConfigManager {
         }
         qs.put(queueId, orderInfo);
 
-        Map<Long, Integer> offsetConsumedCount = orderInfo.offsetConsumedCount;
+        Map<Long/*QueueOffset*/, Integer/*ConsumedCount*/> offsetConsumedCount = orderInfo.offsetConsumedCount;
         int minConsumedTimes = Integer.MAX_VALUE;
         if (offsetConsumedCount != null) {
             Set<Long> offsetSet = offsetConsumedCount.keySet();
             for (Long offset : offsetSet) {
+                // 默认为O次
                 Integer consumedTimes = offsetConsumedCount.getOrDefault(offset, 0);
                 ExtraInfoUtil.buildQueueOffsetOrderCountInfo(orderInfoBuilder, isRetry, queueId, offset, consumedTimes);
                 minConsumedTimes = Math.min(minConsumedTimes, consumedTimes);
@@ -176,6 +179,7 @@ public class ConsumerOrderInfoManager extends ConfigManager {
      * @return -1 : illegal, -2 : no need commit, >= 0 : commit
      */
     public long commitAndNext(String topic, String group, int queueId, long queueOffset, long popTime) {
+        // Topic#ConsumerGroup
         String key = buildKey(topic, group);
         ConcurrentHashMap<Integer/*queueId*/, OrderInfo> qs = table.get(key);
 
@@ -592,6 +596,7 @@ public class ConsumerOrderInfoManager extends ConfigManager {
                 prevOffsetConsumedCount = new HashMap<>();
             }
             Set<Long> preQueueOffsetSet = new HashSet<>();
+            // 上一个顺序消息的Offset列表
             for (int i = 0; i < preOffsetList.size(); i++) {
                 preQueueOffsetSet.add(getQueueOffset(preOffsetList, i));
             }

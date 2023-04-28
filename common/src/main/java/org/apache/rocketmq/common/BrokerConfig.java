@@ -45,7 +45,7 @@ public class BrokerConfig extends BrokerIdentity {
     private boolean recoverConcurrently = false;
 
     private int brokerPermission = PermName.PERM_READ | PermName.PERM_WRITE;
-    private int defaultTopicQueueNums = 8;
+    private int defaultTopicQueueNums = 1;
     @ImportantField
     private boolean autoCreateTopicEnable = true;
 

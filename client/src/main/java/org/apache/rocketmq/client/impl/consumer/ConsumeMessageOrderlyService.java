@@ -91,6 +91,7 @@ public class ConsumeMessageOrderlyService implements ConsumeMessageService {
                 @Override
                 public void run() {
                     try {
+                        // 顺序消费会，并发消费反而不会
                         ConsumeMessageOrderlyService.this.lockMQPeriodically();
                     } catch (Throwable e) {
                         log.error("scheduleAtFixedRate lockMQPeriodically exception", e);

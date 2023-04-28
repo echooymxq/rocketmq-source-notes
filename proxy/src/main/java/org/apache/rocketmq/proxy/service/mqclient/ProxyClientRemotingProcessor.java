@@ -52,6 +52,7 @@ public class ProxyClientRemotingProcessor extends ClientRemotingProcessor {
         return null;
     }
 
+    // 回查事务状态
     @Override
     public RemotingCommand checkTransactionState(ChannelHandlerContext ctx,
         RemotingCommand request) throws RemotingCommandException {

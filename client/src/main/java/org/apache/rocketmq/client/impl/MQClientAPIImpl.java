@@ -863,6 +863,7 @@ public class MQClientAPIImpl implements NameServerUpdateCallback {
                         assert popResult != null;
                         popCallback.onSuccess(popResult);
                     } catch (Exception e) {
+                        e.printStackTrace();
                         popCallback.onException(e);
                     }
                 } else {
@@ -1079,7 +1080,7 @@ public class MQClientAPIImpl implements NameServerUpdateCallback {
             for (MessageExt messageExt : msgFoundList) {
                 String key = ExtraInfoUtil.getStartOffsetInfoMapKey(messageExt.getTopic(), messageExt.getQueueId());
                 if (!sortMap.containsKey(key)) {
-                    sortMap.put(key, new ArrayList<>(4));
+                     sortMap.put(key, new ArrayList<>(4));
                 }
                 sortMap.get(key).add(messageExt.getQueueOffset());
             }
@@ -1095,6 +1096,7 @@ public class MQClientAPIImpl implements NameServerUpdateCallback {
                                 messageExt.getTopic(), brokerName, messageExt.getQueueId()));
 
                         }
+                        // 在客户端生成POP CK句柄
                         messageExt.getProperties().put(MessageConst.PROPERTY_POP_CK, map.get(key) + MessageConst.KEY_SEPARATOR + messageExt.getQueueOffset());
                     } else {
                         if (messageExt.getProperty(MessageConst.PROPERTY_POP_CK) == null) {
@@ -1103,7 +1105,7 @@ public class MQClientAPIImpl implements NameServerUpdateCallback {
                             int index = sortMap.get(queueIdKey).indexOf(messageExt.getQueueOffset());
                             Long msgQueueOffset = msgOffsetInfo.get(queueIdKey).get(index);
                             if (msgQueueOffset != messageExt.getQueueOffset()) {
-                                log.warn("Queue offset[%d] of msg is strange, not equal to the stored in msg, %s", msgQueueOffset, messageExt);
+                                log.warn("Queue offset[{}] of msg is strange, not equal to the stored in msg [{}]", msgQueueOffset, messageExt.getQueueOffset());
                             }
                             messageExt.getProperties().put(MessageConst.PROPERTY_POP_CK,
                                 ExtraInfoUtil.buildExtraInfo(startOffsetInfo.get(queueIdKey), responseHeader.getPopTime(), responseHeader.getInvisibleTime(),

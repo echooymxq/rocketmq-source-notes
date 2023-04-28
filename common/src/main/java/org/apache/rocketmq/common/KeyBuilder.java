@@ -24,6 +24,7 @@ public class KeyBuilder {
     }
 
     public static String parseNormalTopic(String topic, String cid) {
+        // 如果是重试Topic，取重试Topic后面的值
         if (topic.startsWith(MixAll.RETRY_GROUP_TOPIC_PREFIX)) {
             return topic.substring((MixAll.RETRY_GROUP_TOPIC_PREFIX + cid + "_").length());
         } else {

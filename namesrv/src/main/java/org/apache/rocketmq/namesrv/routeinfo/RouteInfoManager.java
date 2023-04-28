@@ -653,6 +653,7 @@ public class RouteInfoManager {
         return Collections.min(brokerData.getBrokerAddrs().keySet()) > 0;
     }
 
+    // 获取Topic路由和Broker路由
     public TopicRouteData pickupTopicRouteData(final String topic) {
         TopicRouteData topicRouteData = new TopicRouteData();
         boolean foundQueueData = false;
@@ -704,6 +705,7 @@ public class RouteInfoManager {
 
             topicRouteData.setTopicQueueMappingByBroker(this.topicQueueMappingInfoTable.get(topic));
 
+            // 该Namesrv是否支持SlaveActMaster,不支持直接返回路由
             if (!namesrvConfig.isSupportActingMaster()) {
                 return topicRouteData;
             }
@@ -718,6 +720,7 @@ public class RouteInfoManager {
 
             boolean needActingMaster = false;
 
+            // 当前Broker组内没有主
             for (final BrokerData brokerData : topicRouteData.getBrokerDatas()) {
                 if (brokerData.getBrokerAddrs().size() != 0
                     && !brokerData.getBrokerAddrs().containsKey(MixAll.MASTER_ID)) {
@@ -742,6 +745,8 @@ public class RouteInfoManager {
                         if (!PermName.isWriteable(queueData.getPerm())) {
                             final Long minBrokerId = Collections.min(brokerAddrs.keySet());
                             final String actingMasterAddr = brokerAddrs.remove(minBrokerId);
+                            // 将该Broker组中最小的BrokerId的Slave修改为主路由(BrokerId设置为0)
+                            // 权限为只读，返回给客户端.
                             brokerAddrs.put(MixAll.MASTER_ID, actingMasterAddr);
                         }
                         break;

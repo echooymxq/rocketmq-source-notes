@@ -128,6 +128,7 @@ public abstract class AbstractSendMessageProcessor implements NettyRequestProces
             return response;
         }
 
+        // 根据订阅组获取重试Topic, %RETRY%" + ConsumeGroupName
         String newTopic = MixAll.getRetryTopic(requestHeader.getGroup());
         int queueIdInt = this.random.nextInt(subscriptionGroupConfig.getRetryQueueNums());
 

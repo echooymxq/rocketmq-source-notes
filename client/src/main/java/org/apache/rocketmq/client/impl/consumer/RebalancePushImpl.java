@@ -116,6 +116,8 @@ public class RebalancePushImpl extends RebalanceImpl {
     @Override
     public boolean clientRebalance(String topic) {
         // POPTODO order pop consume not implement yet
+        // 是否为客户端Rebalance || 是否为顺序消费 || 是否广播消费模式
+        // false || false || false
         return defaultMQPushConsumerImpl.getDefaultMQPushConsumer().isClientRebalance() || defaultMQPushConsumerImpl.isConsumeOrderly() || MessageModel.BROADCASTING.equals(messageModel);
     }
 
@@ -249,6 +251,7 @@ public class RebalancePushImpl extends RebalanceImpl {
 
     @Override
     public int getConsumeInitMode() {
+        //消费者初始化模式，
         final ConsumeFromWhere consumeFromWhere = this.defaultMQPushConsumerImpl.getDefaultMQPushConsumer().getConsumeFromWhere();
         if (ConsumeFromWhere.CONSUME_FROM_FIRST_OFFSET == consumeFromWhere) {
             return ConsumeInitMode.MIN;

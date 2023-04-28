@@ -69,7 +69,8 @@ public class MessageStoreConfig {
 
     private int timerPrecisionMs = 1000;
 
-    private int timerRollWindowSlot = 3600 * 24 * 2;
+//    private int timerRollWindowSlot = 3600 * 24 * 2;
+    private int timerRollWindowSlot = 60;
     private int timerFlushIntervalMs = 1000;
     private int timerGetMessageThreadNum = 3;
     private int timerPutMessageThreadNum = 3;

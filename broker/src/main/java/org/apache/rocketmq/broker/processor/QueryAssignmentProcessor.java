@@ -79,7 +79,7 @@ public class QueryAssignmentProcessor implements NettyRequestProcessor {
         switch (request.getCode()) {
             case RequestCode.QUERY_ASSIGNMENT:
                 return this.queryAssignment(ctx, request);
-            case RequestCode.SET_MESSAGE_REQUEST_MODE:
+            case RequestCode.SET_MESSAGE_REQUEST_MODE: // 设置消息请求模式
                 return this.setMessageRequestMode(ctx, request);
             default:
                 break;
@@ -109,23 +109,29 @@ public class QueryAssignmentProcessor implements NettyRequestProcessor {
 
         SetMessageRequestModeRequestBody setMessageRequestModeRequestBody = this.messageRequestModeManager.getMessageRequestMode(topic, consumerGroup);
 
+        // 如果为空 表示未进行过消息模式设置
         if (setMessageRequestModeRequestBody == null) {
             setMessageRequestModeRequestBody = new SetMessageRequestModeRequestBody();
             setMessageRequestModeRequestBody.setTopic(topic);
             setMessageRequestModeRequestBody.setConsumerGroup(consumerGroup);
 
+            // 重试Topic必须是Pull模式，Why?
             if (topic.startsWith(MixAll.RETRY_GROUP_TOPIC_PREFIX)) {
                 // retry topic must be pull mode
                 setMessageRequestModeRequestBody.setMode(MessageRequestMode.PULL);
             } else {
+                // 可以通过Broker设置Broker的消息请求模式，默认为Pull
                 setMessageRequestModeRequestBody.setMode(brokerController.getBrokerConfig().getDefaultMessageRequestMode());
             }
 
+            // 如果为Pop模式
             if (setMessageRequestModeRequestBody.getMode() == MessageRequestMode.POP) {
+                // 默认为-1
                 setMessageRequestModeRequestBody.setPopShareQueueNum(brokerController.getBrokerConfig().getDefaultPopShareQueueNum());
             }
         }
 
+        // 服务端进行Rebalance
         Set<MessageQueue> messageQueues = doLoadBalance(topic, consumerGroup, clientId, messageModel, strategyName, setMessageRequestModeRequestBody, ctx);
 
         Set<MessageQueueAssignment> assignments = null;
@@ -134,9 +140,7 @@ public class QueryAssignmentProcessor implements NettyRequestProcessor {
             for (MessageQueue messageQueue : messageQueues) {
                 MessageQueueAssignment messageQueueAssignment = new MessageQueueAssignment();
                 messageQueueAssignment.setMessageQueue(messageQueue);
-                if (setMessageRequestModeRequestBody != null) {
-                    messageQueueAssignment.setMode(setMessageRequestModeRequestBody.getMode());
-                }
+                messageQueueAssignment.setMode(setMessageRequestModeRequestBody.getMode());
                 assignments.add(messageQueueAssignment);
             }
         }
@@ -166,6 +170,7 @@ public class QueryAssignmentProcessor implements NettyRequestProcessor {
         final TopicRouteInfoManager topicRouteInfoManager = this.brokerController.getTopicRouteInfoManager();
 
         switch (messageModel) {
+            // 广播模式表示得到所有的队列列表
             case BROADCASTING: {
                 assignedQueueSet = topicRouteInfoManager.getTopicSubscribeInfo(topic);
                 if (assignedQueueSet == null) {
@@ -174,6 +179,7 @@ public class QueryAssignmentProcessor implements NettyRequestProcessor {
                 break;
             }
             case CLUSTERING: {
+                // 获取当前Broker下该Topic的队列
                 Set<MessageQueue> mqSet = topicRouteInfoManager.getTopicSubscribeInfo(topic);
                 if (null == mqSet) {
                     if (!topic.startsWith(MixAll.RETRY_GROUP_TOPIC_PREFIX)) {
@@ -182,6 +188,7 @@ public class QueryAssignmentProcessor implements NettyRequestProcessor {
                     return null;
                 }
 
+                // 是否启用服务端负载均衡
                 if (!brokerController.getBrokerConfig().isServerLoadBalancerEnable()) {
                     return mqSet;
                 }
@@ -238,6 +245,8 @@ public class QueryAssignmentProcessor implements NettyRequestProcessor {
         int popShareQueueNum) {
 
         List<MessageQueue> allocateResult;
+        // 如果客户端的数量 > popShareQueueNum，那么每个客户端都可以得到所有的队列
+        // POP共享的数量大于客户端
         if (popShareQueueNum <= 0 || popShareQueueNum >= cidAll.size() - 1) {
             //each client pop all messagequeue
             allocateResult = new ArrayList<>(mqAll.size());
@@ -248,6 +257,7 @@ public class QueryAssignmentProcessor implements NettyRequestProcessor {
             }
 
         } else {
+            // 如果客户端的数量 <= 队列数量
             if (cidAll.size() <= mqAll.size()) {
                 //consumer working in pop mode could share the MessageQueues assigned to the N (N = popWorkGroupSize) consumer following it in the cid list
                 allocateResult = allocateMessageQueueStrategy.allocate(consumerGroup, clientId, mqAll, cidAll);
@@ -261,6 +271,7 @@ public class QueryAssignmentProcessor implements NettyRequestProcessor {
                     }
                 }
             } else {
+                // 如果客户端的数量 > POP共享队列数 //TODO 都需要测试
                 //make sure each cid is assigned
                 allocateResult = allocate(consumerGroup, clientId, mqAll, cidAll);
             }
@@ -296,12 +307,14 @@ public class QueryAssignmentProcessor implements NettyRequestProcessor {
         return result;
     }
 
+    // 设置消息请求模式
     private RemotingCommand setMessageRequestMode(ChannelHandlerContext ctx,
         RemotingCommand request) throws RemotingCommandException {
         final RemotingCommand response = RemotingCommand.createResponseCommand(null);
         final SetMessageRequestModeRequestBody requestBody = SetMessageRequestModeRequestBody.decode(request.getBody(), SetMessageRequestModeRequestBody.class);
 
         final String topic = requestBody.getTopic();
+        // 重试Topic不能设置
         if (topic.startsWith(MixAll.RETRY_GROUP_TOPIC_PREFIX)) {
             response.setCode(ResponseCode.NO_PERMISSION);
             response.setRemark("retry topic is not allowed to set mode");
@@ -311,6 +324,7 @@ public class QueryAssignmentProcessor implements NettyRequestProcessor {
         final String consumerGroup = requestBody.getConsumerGroup();
 
         this.messageRequestModeManager.setMessageRequestMode(topic, consumerGroup, requestBody);
+        // 持久化到messageRequestMode.json中
         this.messageRequestModeManager.persist();
 
         response.setCode(ResponseCode.SUCCESS);

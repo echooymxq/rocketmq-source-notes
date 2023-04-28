@@ -62,6 +62,19 @@ public class ReceiveMessageActivity extends AbstractMessingActivity {
         ReceiveMessageResponseStreamWriter writer = createWriter(ctx, responseObserver);
 
         try {
+//            message Settings {
+//            optional ClientType client_type = 1;
+//            optional Endpoints access_point = 2;
+//            optional RetryPolicy backoff_policy = 3;
+//            optional google.protobuf.Duration request_timeout = 4;
+//            oneof pub_sub {
+//                Publishing publishing = 5;
+//                Subscription subscription = 6;
+//            }
+//            // User agent details
+//            UA user_agent = 7;
+//            Metric metric = 8;
+//        }
             Settings settings = this.grpcClientSettingsManager.getClientSettings(ctx);
             Subscription subscription = settings.getSubscription();
             boolean fifo = subscription.getFifo();

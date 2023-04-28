@@ -288,6 +288,7 @@ public class ClientActivity extends AbstractMessingActivity {
         ClientChannelInfo clientChannelInfo = new ClientChannelInfo(channel, clientId, languageCode, parseClientVersion(ctx.getClientVersion()));
         this.messagingProcessor.registerProducer(ctx, topicName, clientChannelInfo);
         TopicMessageType topicMessageType = this.messagingProcessor.getMetadataService().getTopicMessageType(topicName);
+        // 如果是事务消息，则添加事务订阅
         if (TopicMessageType.TRANSACTION.equals(topicMessageType)) {
             this.messagingProcessor.addTransactionSubscription(ctx, topicName, topicName);
         }

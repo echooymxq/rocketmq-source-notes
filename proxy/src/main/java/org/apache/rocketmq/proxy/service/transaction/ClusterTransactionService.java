@@ -80,6 +80,7 @@ public class ClusterTransactionService extends AbstractTransactionService {
                 if (clusterDataSet == null) {
                     clusterDataSet = Sets.newHashSet();
                 }
+                // 获取Topic集群数据
                 clusterDataSet.addAll(getClusterDataFromTopic(topic));
                 return clusterDataSet;
             });
@@ -121,7 +122,9 @@ public class ClusterTransactionService extends AbstractTransactionService {
         groupClusterData.remove(group);
     }
 
+    // 扫描生产者的心跳
     public void scanProducerHeartBeat() {
+        // 生产者组
         Set<String> groupSet = groupClusterData.keySet();
 
         Map<String /* cluster */, List<HeartbeatData>> clusterHeartbeatData = new HashMap<>();
@@ -188,6 +191,7 @@ public class ClusterTransactionService extends AbstractTransactionService {
             return;
         }
         for (HeartbeatData heartbeatData : heartbeatDataList) {
+            // 向集群发送心跳
             sendHeartBeatToCluster(clusterName, heartbeatData, brokerAddrNameMap);
         }
         this.brokerAddrNameMapRef.set(brokerAddrNameMap);

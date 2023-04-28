@@ -105,6 +105,7 @@ public class ExtraInfoUtil {
             + MessageConst.KEY_SEPARATOR + brokerName + MessageConst.KEY_SEPARATOR + queueId;
     }
 
+    // POP的队列Offset｜POP时间｜消息不可见时间｜重放队列ID｜是否重试Topic｜BrokerName｜队列ID｜消息队列Offset
     public static String buildExtraInfo(long ckQueueOffset, long popTime, long invisibleTime, int reviveQid, String topic, String brokerName, int queueId,
                                         long msgQueueOffset) {
         String t = NORMAL_TOPIC;
@@ -118,6 +119,7 @@ public class ExtraInfoUtil {
             + MessageConst.KEY_SEPARATOR + msgQueueOffset;
     }
 
+    //
     public static void buildStartOffsetInfo(StringBuilder stringBuilder, boolean retry, int queueId, long startOffset) {
         if (stringBuilder == null) {
             stringBuilder = new StringBuilder(64);
@@ -169,6 +171,7 @@ public class ExtraInfoUtil {
             stringBuilder.append(";");
         }
 
+        // 是否重试TOPIC 队列ID 队列偏移量
         stringBuilder.append(retry ? RETRY_TOPIC : NORMAL_TOPIC)
             .append(MessageConst.KEY_SEPARATOR).append(queueId)
             .append(MessageConst.KEY_SEPARATOR);

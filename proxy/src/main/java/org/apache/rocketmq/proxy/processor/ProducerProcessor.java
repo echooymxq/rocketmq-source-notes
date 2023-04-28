@@ -69,6 +69,7 @@ public class ProducerProcessor extends AbstractProcessor {
         try {
             Message message = messageList.get(0);
             String topic = message.getTopic();
+            // 是否启用主题消息类型检测。
             if (ConfigurationManager.getProxyConfig().isEnableTopicMessageTypeCheck()) {
                 if (topicMessageTypeValidator != null) {
                     // Do not check retry or dlq topic

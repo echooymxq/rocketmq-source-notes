@@ -305,6 +305,7 @@ public class ReplicasManager {
                 stopCheckSyncStateSet();
 
                 // Change config(compatibility problem)
+                // 先设置成备节点，这样可以禁止外部消息的写入。
                 this.brokerController.getMessageStoreConfig().setBrokerRole(BrokerRole.SLAVE);
                 this.brokerController.changeSpecialServiceStatus(false);
                 // The brokerId in brokerConfig just means its role(master[0] or slave[>=1])

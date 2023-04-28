@@ -121,6 +121,7 @@ public class PullMessageService extends ServiceThread {
         while (!this.isStopped()) {
             try {
                 MessageRequest messageRequest = this.messageRequestQueue.take();
+                // 如果是POP消费模式，使用POP消费
                 if (messageRequest.getMessageRequestMode() == MessageRequestMode.POP) {
                     this.popMessage((PopRequest) messageRequest);
                 } else {

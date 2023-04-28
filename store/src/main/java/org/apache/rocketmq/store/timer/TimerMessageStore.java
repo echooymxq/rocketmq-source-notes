@@ -68,6 +68,8 @@ import org.apache.rocketmq.store.metrics.DefaultStoreMetricsManager;
 import org.apache.rocketmq.store.stats.BrokerStatsManager;
 import org.apache.rocketmq.store.util.PerfCounter;
 
+import static org.apache.rocketmq.store.ConsumeQueue.CQ_STORE_UNIT_SIZE;
+
 public class TimerMessageStore {
     public static final String TIMER_TOPIC = TopicValidator.SYSTEM_TOPIC_PREFIX + "wheel_timer";
     public static final String TIMER_OUT_MS = MessageConst.PROPERTY_TIMER_OUT_MS;
@@ -88,6 +90,7 @@ public class TimerMessageStore {
     public boolean debug = false;
 
     private static final Logger LOGGER = LoggerFactory.getLogger(LoggerName.STORE_LOGGER_NAME);
+    private static final Logger POP_LOGGER = LoggerFactory.getLogger(LoggerName.ROCKETMQ_POP_LOGGER_NAME);
     private final PerfCounter.Ticks perfs = new PerfCounter.Ticks(LOGGER);
     private final BlockingQueue<TimerRequest> enqueuePutQueue;
     private final BlockingQueue<List<TimerRequest>> dequeueGetQueue;
@@ -152,10 +155,10 @@ public class TimerMessageStore {
         this.timerLogFileSize = storeConfig.getMappedFileSizeTimerLog();
         this.precisionMs = storeConfig.getTimerPrecisionMs();
         // TimerWheel contains the fixed number of slots regardless of precision.
-        this.slotsTotal = TIMER_WHEEL_TTL_DAY * DAY_SECS;
+        this.slotsTotal = TIMER_WHEEL_TTL_DAY * DAY_SECS; //7天的slot
         this.timerWheel = new TimerWheel(getTimerWheelPath(storeConfig.getStorePathRootDir()),
             this.slotsTotal, precisionMs);
-        this.timerLog = new TimerLog(getTimerLogPath(storeConfig.getStorePathRootDir()), timerLogFileSize);
+        this.timerLog = new TimerLog(getTimerLogPath(storeConfig.getStorePathRootDir()), 1024);
         this.timerMetrics = timerMetrics;
         this.timerCheckpoint = timerCheckpoint;
         this.lastBrokerRole = storeConfig.getBrokerRole();
@@ -610,6 +613,7 @@ public class TimerMessageStore {
         if (!isRunningEnqueue()) {
             return false;
         }
+        // 从延时消息Topic里面获取数据
         ConsumeQueue cq = (ConsumeQueue) this.messageStore.getConsumeQueue(TIMER_TOPIC, queueId);
         if (null == cq) {
             return false;
@@ -620,12 +624,14 @@ public class TimerMessageStore {
         }
         long offset = currQueueOffset;
         SelectMappedBufferResult bufferCQ = cq.getIndexBuffer(offset);
+        LOGGER.info("Timer EnqueueGetService enqueue bufferCQ {}, currQueueOffset {} offset result {}", bufferCQ,
+            currQueueOffset, (offset * CQ_STORE_UNIT_SIZE) > cq.getMinLogicOffset());
         if (null == bufferCQ) {
             return false;
         }
         try {
             int i = 0;
-            for (; i < bufferCQ.getSize(); i += ConsumeQueue.CQ_STORE_UNIT_SIZE) {
+            for (; i < bufferCQ.getSize(); i += CQ_STORE_UNIT_SIZE) {
                 perfs.startTick("enqueue_get");
                 try {
                     long offsetPy = bufferCQ.getByteBuffer().getLong();
@@ -639,7 +645,7 @@ public class TimerMessageStore {
                         lastEnqueueButExpiredStoreTime = msgExt.getStoreTimestamp();
                         long delayedTime = Long.parseLong(msgExt.getProperty(TIMER_OUT_MS));
                         // use CQ offset, not offset in Message
-                        msgExt.setQueueOffset(offset + (i / ConsumeQueue.CQ_STORE_UNIT_SIZE));
+                        msgExt.setQueueOffset(offset + (i / CQ_STORE_UNIT_SIZE));
                         TimerRequest timerRequest = new TimerRequest(offsetPy, sizePy, delayedTime, System.currentTimeMillis(), MAGIC_DEFAULT, msgExt);
                         while (true) {
                             if (enqueuePutQueue.offer(timerRequest, 3, TimeUnit.SECONDS)) {
@@ -665,9 +671,9 @@ public class TimerMessageStore {
                 if (!isRunningEnqueue()) {
                     return false;
                 }
-                currQueueOffset = offset + (i / ConsumeQueue.CQ_STORE_UNIT_SIZE);
+                currQueueOffset = offset + (i / CQ_STORE_UNIT_SIZE);
             }
-            currQueueOffset = offset + (i / ConsumeQueue.CQ_STORE_UNIT_SIZE);
+            currQueueOffset = offset + (i / CQ_STORE_UNIT_SIZE);
             return i > 0;
         } catch (Exception e) {
             LOGGER.error("Unknown exception in enqueuing", e);
@@ -681,10 +687,12 @@ public class TimerMessageStore {
         LOGGER.debug("Do enqueue [{}] [{}]", new Timestamp(delayedTime), messageExt);
         //copy the value first, avoid concurrent problem
         long tmpWriteTimeMs = currWriteTimeMs;
+        // 如果该消息的延时时间大于时间滚动窗口大小，默认为2天，
         boolean needRoll = delayedTime - tmpWriteTimeMs >= timerRollWindowSlots * precisionMs;
         int magic = MAGIC_DEFAULT;
         if (needRoll) {
             magic = magic | MAGIC_ROLL;
+            // (delayedTime - 1000* 3600 * 24 * 2) < 1000 * 3600 * 16
             if (delayedTime - tmpWriteTimeMs - timerRollWindowSlots * precisionMs < timerRollWindowSlots / 3 * precisionMs) {
                 //give enough time to next roll
                 delayedTime = tmpWriteTimeMs + (timerRollWindowSlots / 2) * precisionMs;
@@ -857,6 +865,7 @@ public class TimerMessageStore {
         }
 
         Slot slot = timerWheel.getSlot(currReadTimeMs);
+//        System.out.println("getSlot:===timeMs:" + slot.timeMs + " first:"+ slot.firstPos + " last:" + slot.lastPos);
         if (-1 == slot.timeMs) {
             moveReadTime();
             return 0;
@@ -1038,6 +1047,8 @@ public class TimerMessageStore {
         } else {
             putMessageResult = messageStore.putMessage(message);
         }
+
+        long delayedTime = Long.parseLong(message.getProperty(TIMER_OUT_MS));
 
         int retryNum = 0;
         while (retryNum < 3) {
@@ -1308,9 +1319,11 @@ public class TimerMessageStore {
                             try {
                                 perfs.startTick("enqueue_put");
                                 DefaultStoreMetricsManager.incTimerEnqueueCount(getRealTopic(req.getMsg()));
+                                // 如果消息的延时消息已经到了直接入队到dequeuePutQueue，开始投递到CommitLog
                                 if (shouldRunningDequeue && req.getDelayTime() < currWriteTimeMs) {
                                     dequeuePutQueue.put(req);
                                 } else {
+                                    // 写入TimerLog和TimeWheel中
                                     boolean doEnqueueRes = doEnqueue(req.getOffsetPy(), req.getSizePy(), req.getDelayTime(), req.getMsg());
                                     req.idempotentRelease(doEnqueueRes || storeConfig.isTimerSkipUnknownError());
                                 }

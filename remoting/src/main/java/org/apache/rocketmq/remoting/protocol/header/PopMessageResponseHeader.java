@@ -34,7 +34,7 @@ public class PopMessageResponseHeader implements CommandCustomHeader {
      * the rest num in queue
      */
     @CFNotNull
-    private long restNum;
+    private long restNum; // 队列中剩余的消息数量
 
     private String startOffsetInfo;
     private String msgOffsetInfo;

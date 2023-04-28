@@ -176,6 +176,7 @@ public class HookUtils {
         return null != msg.getProperty(MessageConst.PROPERTY_TIMER_DELIVER_MS) || null != msg.getProperty(MessageConst.PROPERTY_TIMER_DELAY_MS) || null != msg.getProperty(MessageConst.PROPERTY_TIMER_DELAY_SEC);
     }
 
+    // 转换定时消息
     private static PutMessageResult transformTimerMessage(BrokerController brokerController,
         MessageExtBrokerInner msg) {
         //do transform
@@ -197,6 +198,7 @@ public class HookUtils {
                 return new PutMessageResult(PutMessageStatus.WHEEL_TIMER_MSG_ILLEGAL, null);
             }
 
+            //定时消息精度 1s.
             int timerPrecisionMs = brokerController.getMessageStoreConfig().getTimerPrecisionMs();
             if (deliverMs % timerPrecisionMs == 0) {
                 deliverMs -= timerPrecisionMs;
@@ -211,7 +213,7 @@ public class HookUtils {
             MessageAccessor.putProperty(msg, MessageConst.PROPERTY_REAL_TOPIC, msg.getTopic());
             MessageAccessor.putProperty(msg, MessageConst.PROPERTY_REAL_QUEUE_ID, String.valueOf(msg.getQueueId()));
             msg.setPropertiesString(MessageDecoder.messageProperties2String(msg.getProperties()));
-            msg.setTopic(TimerMessageStore.TIMER_TOPIC);
+            msg.setTopic(TimerMessageStore.TIMER_TOPIC); // rmq_sys_wheel_timer
             msg.setQueueId(0);
         } else if (null != msg.getProperty(MessageConst.PROPERTY_TIMER_DEL_UNIQKEY)) {
             return new PutMessageResult(PutMessageStatus.WHEEL_TIMER_MSG_ILLEGAL, null);

@@ -115,7 +115,7 @@ public class TimerWheel {
     public Slot getSlot(long timeMs) {
         Slot slot = getRawSlot(timeMs);
         if (slot.timeMs != timeMs / precisionMs * precisionMs) {
-            return new Slot(-1, -1, -1);
+            return Slot.EMPTY;
         }
         return slot;
     }

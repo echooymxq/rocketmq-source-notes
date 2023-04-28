@@ -71,6 +71,7 @@ public class LocalTopicRouteService extends TopicRouteService {
             proxyBrokerData.setBrokerName(brokerData.getBrokerName());
             for (Long brokerId : brokerData.getBrokerAddrs().keySet()) {
                 String brokerAddr = brokerData.getBrokerAddrs().get(brokerId);
+                // 这里会把Broker的真实地址返回给客户端，这种后续应该可以用它访问到其它的Broker
                 HostAndPort brokerHostAndPort = HostAndPort.fromString(brokerAddr);
                 HostAndPort grpcHostAndPort = HostAndPort.fromParts(brokerHostAndPort.getHost(), grpcPort);
 

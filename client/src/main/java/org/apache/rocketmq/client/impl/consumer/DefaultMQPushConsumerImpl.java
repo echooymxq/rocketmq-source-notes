@@ -490,6 +490,7 @@ public class DefaultMQPushConsumerImpl implements MQConsumerInner {
         }
     }
 
+    // POP请求消息
     void popMessage(final PopRequest popRequest) {
         final PopProcessQueue processQueue = popRequest.getPopProcessQueue();
         if (processQueue.isDropped()) {
@@ -598,7 +599,7 @@ public class DefaultMQPushConsumerImpl implements MQConsumerInner {
 
 
         try {
-
+            // 默认消息不可见时间1min
             long invisibleTime = this.defaultMQPushConsumer.getPopInvisibleTime();
             if (invisibleTime < MIN_POP_INVISIBLE_TIME || invisibleTime > MAX_POP_INVISIBLE_TIME) {
                 invisibleTime = 60000;
@@ -646,6 +647,7 @@ public class DefaultMQPushConsumerImpl implements MQConsumerInner {
             if (msgFoundList.size() != msgListFilterAgain.size()) {
                 for (MessageExt msg : msgFoundList) {
                     if (!msgListFilterAgain.contains(msg)) {
+                        // 应该是将过滤的消息提前给ACK掉。
                         ackAsync(msg, this.groupName());
                     }
                 }
@@ -747,6 +749,7 @@ public class DefaultMQPushConsumerImpl implements MQConsumerInner {
             } else {
                 String brokerAddr = (null != brokerName) ? this.mQClientFactory.findBrokerAddressInPublish(brokerName)
                     : RemotingHelper.parseSocketAddressAddr(msg.getStoreHost());
+                // 还是该将消息发送到原来的Topic中。
                 this.mQClientFactory.getMQClientAPIImpl().consumerSendMessageBack(brokerAddr, brokerName, msg,
                     this.defaultMQPushConsumer.getConsumerGroup(), delayLevel, 5000, getMaxReconsumeTimes());
             }
@@ -754,6 +757,7 @@ public class DefaultMQPushConsumerImpl implements MQConsumerInner {
             log.error("Failed to send message back, consumerGroup={}, brokerName={}, mq={}, message={}",
                 this.defaultMQPushConsumer.getConsumerGroup(), brokerName, mq, msg, t);
             if (needRetry) {
+                // 如上述发送重试消息失败，则将该条消息发送到单独的重试Topic中。
                 sendMessageBackAsNormalMessage(msg);
             }
         } finally {
@@ -943,6 +947,7 @@ public class DefaultMQPushConsumerImpl implements MQConsumerInner {
                 }
                 this.offsetStore.load();
 
+                // 如果是请求顺序消费
                 if (this.getMessageListenerInner() instanceof MessageListenerOrderly) {
                     this.consumeOrderly = true;
                     this.consumeMessageService =

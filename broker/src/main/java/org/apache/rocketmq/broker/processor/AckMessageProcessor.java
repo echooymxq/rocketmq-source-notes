@@ -19,6 +19,8 @@ package org.apache.rocketmq.broker.processor;
 import com.alibaba.fastjson.JSON;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 import org.apache.rocketmq.broker.BrokerController;
 import org.apache.rocketmq.broker.metrics.PopMetricsManager;
 import org.apache.rocketmq.common.KeyBuilder;
@@ -51,6 +53,7 @@ public class AckMessageProcessor implements NettyRequestProcessor {
 
     public AckMessageProcessor(final BrokerController brokerController) {
         this.brokerController = brokerController;
+        // rmq_sys_REVIVE_LOG_BrokerClusterName
         this.reviveTopic = PopAckConstants.buildClusterReviveTopic(this.brokerController.getBrokerConfig().getBrokerClusterName());
         this.popReviveServices = new PopReviveService[this.brokerController.getBrokerConfig().getReviveQueueNum()];
         for (int i = 0; i < this.brokerController.getBrokerConfig().getReviveQueueNum(); i++) {
@@ -105,7 +108,6 @@ public class AckMessageProcessor implements NettyRequestProcessor {
     private RemotingCommand processRequest(final Channel channel, RemotingCommand request,
         boolean brokerAllowSuspend) throws RemotingCommandException {
         final AckMessageRequestHeader requestHeader = (AckMessageRequestHeader) request.decodeCommandCustomHeader(AckMessageRequestHeader.class);
-        MessageExtBrokerInner msgInner = new MessageExtBrokerInner();
         AckMsg ackMsg = new AckMsg();
         RemotingCommand response = RemotingCommand.createResponseCommand(ResponseCode.SUCCESS, null);
         response.setOpaque(request.getOpaque());
@@ -145,29 +147,36 @@ public class AckMessageProcessor implements NettyRequestProcessor {
         ackMsg.setPopTime(ExtraInfoUtil.getPopTime(extraInfo));
         ackMsg.setBrokerName(ExtraInfoUtil.getBrokerName(extraInfo));
 
+        // 此reviveQueueId是在POP消息的时候轮询分配的
         int rqId = ExtraInfoUtil.getReviveQid(extraInfo);
         long invisibleTime = ExtraInfoUtil.getInvisibleTime(extraInfo);
 
         this.brokerController.getBrokerStatsManager().incBrokerAckNums(1);
         this.brokerController.getBrokerStatsManager().incGroupAckNums(requestHeader.getConsumerGroup(), requestHeader.getTopic(), 1);
 
+        // 表示顺序消息的ACK
         if (rqId == KeyBuilder.POP_ORDER_REVIVE_QUEUE) {
             // order
             String lockKey = requestHeader.getTopic() + PopAckConstants.SPLIT
                 + requestHeader.getConsumerGroup() + PopAckConstants.SPLIT + requestHeader.getQueueId();
+
             long oldOffset = this.brokerController.getConsumerOffsetManager().queryOffset(requestHeader.getConsumerGroup(),
                 requestHeader.getTopic(), requestHeader.getQueueId());
+            // 当前需要确认的Offset < 队列Offset直接返回
             if (requestHeader.getOffset() < oldOffset) {
                 return response;
             }
+            // 获取队列锁
             while (!this.brokerController.getPopMessageProcessor().getQueueLockManager().tryLock(lockKey)) {
             }
             try {
+                // 当前需要确认的Offset < 队列Offset直接返回
                 oldOffset = this.brokerController.getConsumerOffsetManager().queryOffset(requestHeader.getConsumerGroup(),
                     requestHeader.getTopic(), requestHeader.getQueueId());
                 if (requestHeader.getOffset() < oldOffset) {
                     return response;
                 }
+                // 尝试提交Offset
                 long nextOffset = brokerController.getConsumerOrderInfoManager().commitAndNext(
                     requestHeader.getTopic(), requestHeader.getConsumerGroup(),
                     requestHeader.getQueueId(), requestHeader.getOffset(),
@@ -198,22 +207,26 @@ public class AckMessageProcessor implements NettyRequestProcessor {
             return response;
         }
 
+        // 先尝试放入内存匹配，如果成功则直接返回。失败可能是内存匹配未开启
         if (this.brokerController.getPopMessageProcessor().getPopBufferMergeService().addAk(rqId, ackMsg)) {
             decInFlightMessageNum(requestHeader);
             return response;
         }
 
+        // 构造 Ack 消息
+        MessageExtBrokerInner msgInner = new MessageExtBrokerInner();
         msgInner.setTopic(reviveTopic);
         msgInner.setBody(JSON.toJSONString(ackMsg).getBytes(DataConverter.charset));
-        //msgInner.setQueueId(Integer.valueOf(extraInfo[3]));
         msgInner.setQueueId(rqId);
         msgInner.setTags(PopAckConstants.ACK_TAG);
         msgInner.setBornTimestamp(System.currentTimeMillis());
         msgInner.setBornHost(this.brokerController.getStoreHost());
         msgInner.setStoreHost(this.brokerController.getStoreHost());
+        // 定时消息，定时到唤醒重试时间投递
         msgInner.setDeliverTimeMs(ExtraInfoUtil.getPopTime(extraInfo) + invisibleTime);
         msgInner.getProperties().put(MessageConst.PROPERTY_UNIQ_CLIENT_MESSAGE_ID_KEYIDX, PopMessageProcessor.genAckUniqueId(ackMsg));
         msgInner.setPropertiesString(MessageDecoder.messageProperties2String(msgInner.getProperties()));
+        // 保存 Ack 消息到磁盘
         PutMessageResult putMessageResult = this.brokerController.getEscapeBridge().putMessageToSpecificQueue(msgInner);
         if (putMessageResult.getPutMessageStatus() != PutMessageStatus.PUT_OK
             && putMessageResult.getPutMessageStatus() != PutMessageStatus.FLUSH_DISK_TIMEOUT
