@@ -39,7 +39,7 @@ import org.apache.rocketmq.common.consumer.ReceiptHandle;
 import org.apache.rocketmq.common.message.Message;
 import org.apache.rocketmq.common.message.MessageQueue;
 import org.apache.rocketmq.common.thread.ThreadPoolMonitor;
-import org.apache.rocketmq.proxy.common.AbstractStartAndShutdown;
+import org.apache.rocketmq.common.utils.AbstractStartAndShutdown;
 import org.apache.rocketmq.proxy.common.Address;
 import org.apache.rocketmq.proxy.common.ProxyContext;
 import org.apache.rocketmq.proxy.config.ConfigurationManager;
@@ -127,13 +127,13 @@ public class DefaultMessagingProcessor extends AbstractStartAndShutdown implemen
 
     @Override
     public SubscriptionGroupConfig getSubscriptionGroupConfig(ProxyContext ctx, String consumerGroupName) {
-        return this.serviceManager.getMetadataService().getSubscriptionGroupConfig(consumerGroupName);
+        return this.serviceManager.getMetadataService().getSubscriptionGroupConfig(ctx, consumerGroupName);
     }
 
     @Override
     public ProxyTopicRouteData getTopicRouteDataForProxy(ProxyContext ctx, List<Address> requestHostAndPortList,
         String topicName) throws Exception {
-        return this.serviceManager.getTopicRouteService().getTopicRouteForProxy(requestHostAndPortList, topicName);
+        return this.serviceManager.getTopicRouteService().getTopicRouteForProxy(ctx, requestHostAndPortList, topicName);
     }
 
     @Override
@@ -168,10 +168,11 @@ public class DefaultMessagingProcessor extends AbstractStartAndShutdown implemen
         SubscriptionData subscriptionData,
         boolean fifo,
         PopMessageResultFilter popMessageResultFilter,
+        String attemptId,
         long timeoutMillis
     ) {
         return this.consumerProcessor.popMessage(ctx, queueSelector, consumerGroup, topic, maxMsgNums,
-            invisibleTime, pollTime, initMode, subscriptionData, fifo, popMessageResultFilter, timeoutMillis);
+            invisibleTime, pollTime, initMode, subscriptionData, fifo, popMessageResultFilter, attemptId, timeoutMillis);
     }
 
     @Override
@@ -289,8 +290,8 @@ public class DefaultMessagingProcessor extends AbstractStartAndShutdown implemen
     }
 
     @Override
-    public ConsumerGroupInfo getConsumerGroupInfo(String consumerGroup) {
-        return this.clientProcessor.getConsumerGroupInfo(consumerGroup);
+    public ConsumerGroupInfo getConsumerGroupInfo(ProxyContext ctx, String consumerGroup) {
+        return this.clientProcessor.getConsumerGroupInfo(ctx, consumerGroup);
     }
 
     @Override

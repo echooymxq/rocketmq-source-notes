@@ -54,6 +54,7 @@ import org.apache.rocketmq.store.GetMessageResult;
 import org.apache.rocketmq.store.GetMessageStatus;
 import org.apache.rocketmq.store.PutMessageResult;
 import org.apache.rocketmq.store.pop.AckMsg;
+import org.apache.rocketmq.store.pop.BatchAckMsg;
 import org.apache.rocketmq.store.pop.PopCheckPoint;
 
 import static org.apache.rocketmq.broker.metrics.BrokerMetricsConstant.LABEL_CONSUMER_GROUP;
@@ -428,25 +429,9 @@ public class PopReviveService extends ServiceThread {
                         if (!brokerController.getBrokerConfig().isEnableSkipLongAwaitingAck()) {
                             continue;
                         }
-                        // ACK等待的时间为当前时间-消息投递时间
-                        // deliverTimeMs是在存入到reviveTopic中时设置的，值为POP时间 + InvisibleTime
-                        long ackWaitTime = System.currentTimeMillis() - messageExt.getDeliverTimeMs();
-                        // 默认3分钟
-                        long reviveAckWaitMs = brokerController.getBrokerConfig().getReviveAckWaitMs();
-                        // 如果消息的ACK时间已经超过3分钟, 那么这条ACK请求已经没有意义了，下面创建一个mock CheckPoint，只是为了
-                        // 在mergeAndRevive的时候更新revive Topic的消费进度，为减少重复消费做一层保障而已。
-                        // 未被ACK的消息，已经在处理之前的CheckPoint发送到重试Topic了。
-                        // 每条ACK请求都会创建一个Mock的CheckPoint
-                        if (ackWaitTime > reviveAckWaitMs) {
-                            // will use the reviveOffset of popCheckPoint to commit offset in mergeAndRevive
-                            PopCheckPoint mockPoint = createMockCkForAck(ackMsg, messageExt.getQueueOffset());
-                            POP_LOGGER.warn(
-                                "ack wait for {}ms cannot find ck, skip this ack. mergeKey:{}, ack:{}, mockCk:{}",
-                                reviveAckWaitMs, mergeKey, ackMsg, mockPoint);
-                            mockPointMap.put(mergeKey, mockPoint);
-                            if (firstRt == 0) {
-                                firstRt = mockPoint.getReviveTime();
-                            }
+
+                        if (mockCkForAck(messageExt, ackMsg, mergeKey, mockPointMap) && firstRt == 0) {
+                            firstRt = mockPointMap.get(mergeKey).getReviveTime();
                         }
                     } else {
                         // 如果 HashMap 中有 CheckPoint，计算 ACK 的 bit 码表
@@ -455,6 +440,34 @@ public class PopReviveService extends ServiceThread {
                             point.setBitMap(DataConverter.setBit(point.getBitMap(), indexOfAck, true));
                         } else {
                             POP_LOGGER.error("invalid ack index, {}, {}", ackMsg, point);
+                        }
+                    }
+                } else if (PopAckConstants.BATCH_ACK_TAG.equals(messageExt.getTags())) {
+                    String raw = new String(messageExt.getBody(), DataConverter.charset);
+                    if (brokerController.getBrokerConfig().isEnablePopLog()) {
+                        POP_LOGGER.info("reviveQueueId={}, find batch ack, offset:{}, raw : {}", messageExt.getQueueId(), messageExt.getQueueOffset(), raw);
+                    }
+
+                    BatchAckMsg bAckMsg = JSON.parseObject(raw, BatchAckMsg.class);
+                    PopMetricsManager.incPopReviveAckGetCount(bAckMsg, queueId);
+                    String mergeKey = bAckMsg.getTopic() + bAckMsg.getConsumerGroup() + bAckMsg.getQueueId() + bAckMsg.getStartOffset() + bAckMsg.getPopTime();
+                    PopCheckPoint point = map.get(mergeKey);
+                    if (point == null) {
+                        if (!brokerController.getBrokerConfig().isEnableSkipLongAwaitingAck()) {
+                            continue;
+                        }
+                        if (mockCkForAck(messageExt, bAckMsg, mergeKey, mockPointMap) && firstRt == 0) {
+                            firstRt = mockPointMap.get(mergeKey).getReviveTime();
+                        }
+                    } else {
+                        List<Long> ackOffsetList = bAckMsg.getAckOffsetList();
+                        for (Long ackOffset : ackOffsetList) {
+                            int indexOfAck = point.indexOfAck(ackOffset);
+                            if (indexOfAck > -1) {
+                                point.setBitMap(DataConverter.setBit(point.getBitMap(), indexOfAck, true));
+                            } else {
+                                POP_LOGGER.error("invalid batch ack index, {}, {}", bAckMsg, point);
+                            }
                         }
                     }
                 }
@@ -469,6 +482,28 @@ public class PopReviveService extends ServiceThread {
         }
         consumeReviveObj.map.putAll(mockPointMap);
         consumeReviveObj.endTime = endTime;
+    }
+
+    private boolean mockCkForAck(MessageExt messageExt, AckMsg ackMsg, String mergeKey, HashMap<String, PopCheckPoint> mockPointMap) {
+        // ACK等待的时间为当前时间-消息投递时间
+        // deliverTimeMs是在存入到reviveTopic中时设置的，值为POP时间 + InvisibleTime
+        long ackWaitTime = System.currentTimeMillis() - messageExt.getDeliverTimeMs();
+        // 默认3分钟
+        long reviveAckWaitMs = brokerController.getBrokerConfig().getReviveAckWaitMs();
+        if (ackWaitTime > reviveAckWaitMs) {
+            // will use the reviveOffset of popCheckPoint to commit offset in mergeAndRevive
+            // 如果消息的ACK时间已经超过3分钟, 那么这条ACK请求已经没有意义了，下面创建一个mock CheckPoint，只是为了
+            // 在mergeAndRevive的时候更新revive Topic的消费进度，为减少重复消费做一层保障而已。
+            // 未被ACK的消息，已经在处理之前的CheckPoint发送到重试Topic了。
+            // 每条ACK请求都会创建一个Mock的CheckPoint
+            PopCheckPoint mockPoint = createMockCkForAck(ackMsg, messageExt.getQueueOffset());
+            POP_LOGGER.warn(
+                    "ack wait for {}ms cannot find ck, skip this ack. mergeKey:{}, ack:{}, mockCk:{}",
+                    reviveAckWaitMs, mergeKey, ackMsg, mockPoint);
+            mockPointMap.put(mergeKey, mockPoint);
+            return true;
+        }
+        return false;
     }
 
     private PopCheckPoint createMockCkForAck(AckMsg ackMsg, long reviveOffset) {

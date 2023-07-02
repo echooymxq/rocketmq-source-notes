@@ -35,7 +35,7 @@ import org.apache.rocketmq.common.message.Message;
 import org.apache.rocketmq.common.message.MessageQueue;
 import org.apache.rocketmq.proxy.common.Address;
 import org.apache.rocketmq.proxy.common.ProxyContext;
-import org.apache.rocketmq.proxy.common.StartAndShutdown;
+import org.apache.rocketmq.common.utils.StartAndShutdown;
 import org.apache.rocketmq.proxy.service.metadata.MetadataService;
 import org.apache.rocketmq.proxy.service.relay.ProxyRelayService;
 import org.apache.rocketmq.proxy.service.route.ProxyTopicRouteData;
@@ -131,6 +131,7 @@ public interface MessagingProcessor extends StartAndShutdown {
         SubscriptionData subscriptionData,
         boolean fifo,
         PopMessageResultFilter popMessageResultFilter,
+        String attemptId,
         long timeoutMillis
     );
 
@@ -287,7 +288,7 @@ public interface MessagingProcessor extends StartAndShutdown {
 
     void doChannelCloseEvent(String remoteAddr, Channel channel);
 
-    ConsumerGroupInfo getConsumerGroupInfo(String consumerGroup);
+    ConsumerGroupInfo getConsumerGroupInfo(ProxyContext ctx, String consumerGroup);
 
     void addTransactionSubscription(
         ProxyContext ctx,

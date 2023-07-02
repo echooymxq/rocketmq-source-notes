@@ -53,7 +53,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.rocketmq.common.constant.LoggerName;
 import org.apache.rocketmq.common.thread.ThreadPoolMonitor;
 import org.apache.rocketmq.proxy.common.ProxyContext;
-import org.apache.rocketmq.proxy.common.StartAndShutdown;
+import org.apache.rocketmq.common.utils.StartAndShutdown;
 import org.apache.rocketmq.proxy.config.ConfigurationManager;
 import org.apache.rocketmq.proxy.config.ProxyConfig;
 import org.apache.rocketmq.proxy.grpc.interceptor.InterceptorConstants;
@@ -378,17 +378,17 @@ public class GrpcMessagingApplication extends MessagingServiceGrpc.MessagingServ
     @Override
     public StreamObserver<TelemetryCommand> telemetry(StreamObserver<TelemetryCommand> responseObserver) {
         Function<Status, TelemetryCommand> statusResponseCreator = status -> TelemetryCommand.newBuilder().setStatus(status).build();
-        ProxyContext context = createContext();
-        StreamObserver<TelemetryCommand> responseTelemetryCommand = grpcMessingActivity.telemetry(context, responseObserver);
+        ContextStreamObserver<TelemetryCommand> responseTelemetryCommand = grpcMessingActivity.telemetry(responseObserver);
         return new StreamObserver<TelemetryCommand>() {
             @Override
             public void onNext(TelemetryCommand value) {
+                ProxyContext context = createContext();
                 try {
                     validateContext(context);
                     addExecutor(clientManagerThreadPoolExecutor,
                         context,
                         value,
-                        () -> responseTelemetryCommand.onNext(value),
+                        () -> responseTelemetryCommand.onNext(context, value),
                         responseObserver,
                         statusResponseCreator);
                 } catch (Throwable t) {

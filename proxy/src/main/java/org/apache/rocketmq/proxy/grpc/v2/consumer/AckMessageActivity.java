@@ -104,11 +104,7 @@ public class AckMessageActivity extends AbstractMessingActivity {
             // 所以客户端做了限制，ACK发往的EndPoint是Receive到消息的Endpoint.
             // 应该不是这个原因。
             // 上面已经传递了ReceiptHandle了，为什么还需要呢？
-            MessageReceiptHandle messageReceiptHandle = receiptHandleProcessor.removeReceiptHandle(grpcChannelManager.getChannel(ctx.getClientID()),
-                group,
-                ackMessageEntry.getMessageId(),
-                ackMessageEntry.getReceiptHandle()
-            );
+            MessageReceiptHandle messageReceiptHandle = receiptHandleProcessor.removeReceiptHandle(ctx, grpcChannelManager.getChannel(ctx.getClientID()), group, ackMessageEntry.getMessageId(), ackMessageEntry.getReceiptHandle());
             if (messageReceiptHandle != null) {
                 handleString = messageReceiptHandle.getReceiptHandleStr();
             }

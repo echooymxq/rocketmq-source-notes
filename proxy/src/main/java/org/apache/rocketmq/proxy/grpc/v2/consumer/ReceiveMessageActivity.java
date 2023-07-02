@@ -146,6 +146,7 @@ public class ReceiveMessageActivity extends AbstractMessingActivity {
                     subscriptionData,
                     fifo,
                     new PopMessageResultFilterImpl(maxAttempts),
+                    request.getAttemptId(),
                     timeRemaining
                 ).thenAccept(popResult -> {
                     if (proxyConfig.isEnableProxyAutoRenew() && request.getAutoRenew()) {
@@ -157,7 +158,7 @@ public class ReceiveMessageActivity extends AbstractMessingActivity {
                                     MessageReceiptHandle messageReceiptHandle =
                                         new MessageReceiptHandle(group, topic, messageExt.getQueueId(), receiptHandle, messageExt.getMsgId(),
                                             messageExt.getQueueOffset(), messageExt.getReconsumeTimes());
-                                    receiptHandleProcessor.addReceiptHandle(grpcChannelManager.getChannel(ctx.getClientID()), group, messageExt.getMsgId(), receiptHandle, messageReceiptHandle);
+                                    receiptHandleProcessor.addReceiptHandle(ctx, grpcChannelManager.getChannel(ctx.getClientID()), group, messageExt.getMsgId(), messageReceiptHandle);
                                 }
                             }
                         }

@@ -335,10 +335,13 @@ public class DefaultMessageStore implements MessageStore {
                     new StoreCheckpoint(
                         StorePathConfigHelper.getStoreCheckpoint(this.messageStoreConfig.getStorePathRootDir()));
                 this.masterFlushedOffset = this.storeCheckpoint.getMasterFlushedOffset();
+                setConfirmOffset(this.storeCheckpoint.getConfirmPhyOffset());
+
                 result = this.indexService.load(lastExitOK);
                 this.recover(lastExitOK);
                 LOGGER.info("message store recover end, and the max phy offset = {}", this.getMaxPhyOffset());
             }
+
 
             long maxOffset = this.getMaxPhyOffset();
             this.setBrokerInitMaxOffset(maxOffset);
@@ -715,7 +718,6 @@ public class DefaultMessageStore implements MessageStore {
             this.reputMessageService = new ConcurrentReputMessageService();
         }
 
-
         long resetReputOffset = Math.min(oldReputFromOffset, offsetToTruncate);
 
         LOGGER.info("oldReputFromOffset is {}, reset reput from offset to {}", oldReputFromOffset, resetReputOffset);
@@ -887,6 +889,10 @@ public class DefaultMessageStore implements MessageStore {
 
                                 nextPhyFileStartOffset = this.commitLog.rollNextFile(offsetPy);
                                 continue;
+                            }
+
+                            if (messageStoreConfig.isColdDataFlowControlEnable() && !MixAll.isSysConsumerGroupForNoColdReadLimit(group) && !selectResult.isInCache()) {
+                                getResult.setColdDataSum(getResult.getColdDataSum() + sizePy);
                             }
 
                             if (messageFilter != null
@@ -1592,12 +1598,17 @@ public class DefaultMessageStore implements MessageStore {
         }
     }
 
+    // Fetch and compute the newest confirmOffset.
+    // Even if it is just inited.
     @Override
     public long getConfirmOffset() {
-        if (this.brokerConfig.isEnableControllerMode()) {
-            return ((AutoSwitchHAService) this.haService).getConfirmOffset();
-        }
         return this.commitLog.getConfirmOffset();
+    }
+
+    // Fetch the original confirmOffset's value.
+    // Without checking and re-computing.
+    public long getConfirmOffsetDirectly() {
+        return this.commitLog.getConfirmOffsetDirectly();
     }
 
     @Override
@@ -1701,6 +1712,16 @@ public class DefaultMessageStore implements MessageStore {
 
     public boolean checkInDiskByCommitOffset(long offsetPy) {
         return offsetPy >= commitLog.getMinOffset();
+    }
+
+    /**
+     * The ratio val is estimated by the experiment and experience
+     * so that the result is not high accurate for different business
+     * @return
+     */
+    public boolean checkInColdAreaByCommitOffset(long offsetPy, long maxOffsetPy) {
+        long memory = (long)(StoreUtil.TOTAL_PHYSICAL_MEMORY_SIZE * (this.messageStoreConfig.getAccessMessageInMemoryHotRatio() / 100.0));
+        return (maxOffsetPy - offsetPy) > memory;
     }
 
     private boolean isTheBatchFull(int sizePy, int unitBatchNum, int maxMsgNums, long maxMsgSize, int bufferTotal,
@@ -2752,9 +2773,6 @@ public class DefaultMessageStore implements MessageStore {
         }
 
         public boolean isCommitLogAvailable() {
-            if (DefaultMessageStore.this.getMessageStoreConfig().isDuplicationEnable()) {
-                return this.reputFromOffset <= DefaultMessageStore.this.commitLog.getConfirmOffset();
-            }
             return this.reputFromOffset < DefaultMessageStore.this.getConfirmOffset();
         }
 
@@ -3270,5 +3288,7 @@ public class DefaultMessageStore implements MessageStore {
             (this.brokerConfig.isEnableControllerMode() || this.messageStoreConfig.getBrokerRole() != BrokerRole.SLAVE);
     }
 
-
+    public long getReputFromOffset() {
+        return this.reputMessageService.getReputFromOffset();
+    }
 }

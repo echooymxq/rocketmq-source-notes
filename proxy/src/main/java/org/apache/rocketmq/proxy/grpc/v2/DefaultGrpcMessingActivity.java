@@ -42,7 +42,7 @@ import java.util.concurrent.CompletableFuture;
 import org.apache.rocketmq.common.constant.LoggerName;
 import org.apache.rocketmq.logging.org.slf4j.Logger;
 import org.apache.rocketmq.logging.org.slf4j.LoggerFactory;
-import org.apache.rocketmq.proxy.common.AbstractStartAndShutdown;
+import org.apache.rocketmq.common.utils.AbstractStartAndShutdown;
 import org.apache.rocketmq.proxy.common.ProxyContext;
 import org.apache.rocketmq.proxy.grpc.v2.channel.GrpcChannelManager;
 import org.apache.rocketmq.proxy.grpc.v2.client.ClientActivity;
@@ -150,8 +150,7 @@ public class DefaultGrpcMessingActivity extends AbstractStartAndShutdown impleme
     }
 
     @Override
-    public StreamObserver<TelemetryCommand> telemetry(ProxyContext ctx,
-        StreamObserver<TelemetryCommand> responseObserver) {
-        return this.clientActivity.telemetry(ctx, responseObserver);
+    public ContextStreamObserver<TelemetryCommand> telemetry(StreamObserver<TelemetryCommand> responseObserver) {
+        return this.clientActivity.telemetry(responseObserver);
     }
 }
