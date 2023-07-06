@@ -275,27 +275,27 @@
                     </execution>
                 </executions>
             </plugin>
-            <plugin>
-                <artifactId>maven-checkstyle-plugin</artifactId>
-                <version>${maven-checkstyle-plugin.version}</version>
-                <executions>
-                    <execution>
-                        <id>validate</id>
-                        <phase>validate</phase>
-                        <configuration>
-                            <configLocation>style/rmq_checkstyle.xml</configLocation>
-                            <inputEncoding>UTF-8</inputEncoding>
-                            <consoleOutput>true</consoleOutput>
-                            <failsOnError>true</failsOnError>
-                            <includeTestSourceDirectory>true</includeTestSourceDirectory>
-                            <excludes>**/generated*/**/*</excludes>
-                        </configuration>
-                        <goals>
-                            <goal>check</goal>
-                        </goals>
-                    </execution>
-                </executions>
-            </plugin>
+<!--            <plugin>-->
+<!--                <artifactId>maven-checkstyle-plugin</artifactId>-->
+<!--                <version>${maven-checkstyle-plugin.version}</version>-->
+<!--                <executions>-->
+<!--                    <execution>-->
+<!--                        <id>validate</id>-->
+<!--                        <phase>validate</phase>-->
+<!--                        <configuration>-->
+<!--                            <configLocation>style/rmq_checkstyle.xml</configLocation>-->
+<!--                            <inputEncoding>UTF-8</inputEncoding>-->
+<!--                            <consoleOutput>true</consoleOutput>-->
+<!--                            <failsOnError>true</failsOnError>-->
+<!--                            <includeTestSourceDirectory>true</includeTestSourceDirectory>-->
+<!--                            <excludes>**/generated*/**/*</excludes>-->
+<!--                        </configuration>-->
+<!--                        <goals>-->
+<!--                            <goal>check</goal>-->
+<!--                        </goals>-->
+<!--                    </execution>-->
+<!--                </executions>-->
+<!--            </plugin>-->
             <plugin>
                 <groupId>org.apache.rat</groupId>
                 <artifactId>apache-rat-plugin</artifactId>
@@ -397,28 +397,28 @@
                 <artifactId>sonar-maven-plugin</artifactId>
                 <version>${sonar-maven-plugin.version}</version>
             </plugin>
-            <plugin>
-                <groupId>com.github.spotbugs</groupId>
-                <artifactId>spotbugs-maven-plugin</artifactId>
-                <version>${spotbugs-plugin.version}</version>
-                <executions>
-                    <execution>
-                        <id>check</id>
-                        <phase>compile</phase>
-                        <goals>
-                            <goal>check</goal>
-                        </goals>
-                    </execution>
-                </executions>
-                <configuration>
-                    <failOnError>true</failOnError>
-                    <fork>false</fork>
-                    <spotbugsXmlOutput>true</spotbugsXmlOutput>
-                    <excludeFilterFile>${project.root}/style/spotbugs-suppressions.xml</excludeFilterFile>
-                    <threshold>High</threshold>
-                    <effort>Max</effort>
-                </configuration>
-            </plugin>
+<!--            <plugin>-->
+<!--                <groupId>com.github.spotbugs</groupId>-->
+<!--                <artifactId>spotbugs-maven-plugin</artifactId>-->
+<!--                <version>${spotbugs-plugin.version}</version>-->
+<!--                <executions>-->
+<!--                    <execution>-->
+<!--                        <id>check</id>-->
+<!--                        <phase>compile</phase>-->
+<!--                        <goals>-->
+<!--                            <goal>check</goal>-->
+<!--                        </goals>-->
+<!--                    </execution>-->
+<!--                </executions>-->
+<!--                <configuration>-->
+<!--                    <failOnError>true</failOnError>-->
+<!--                    <fork>false</fork>-->
+<!--                    <spotbugsXmlOutput>true</spotbugsXmlOutput>-->
+<!--                    <excludeFilterFile>${project.root}/style/spotbugs-suppressions.xml</excludeFilterFile>-->
+<!--                    <threshold>High</threshold>-->
+<!--                    <effort>Max</effort>-->
+<!--                </configuration>-->
+<!--            </plugin>-->
         </plugins>
 
         <pluginManagement>

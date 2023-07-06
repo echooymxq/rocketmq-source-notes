@@ -175,17 +175,27 @@ public class MQClientInstance {
         TopicPublishInfo info = new TopicPublishInfo();
         // TO DO should check the usage of raw route, it is better to remove such field
         info.setTopicRouteData(route);
+        // 如果Topic的顺序消息配置不为空
+        // broker-a:8;broker-b:8
         if (route.getOrderTopicConf() != null && route.getOrderTopicConf().length() > 0) {
             String[] brokers = route.getOrderTopicConf().split(";");
             for (String broker : brokers) {
+                // broker-a:8
                 String[] item = broker.split(":");
+                // 队列数
                 int nums = Integer.parseInt(item[1]);
                 for (int i = 0; i < nums; i++) {
                     MessageQueue mq = new MessageQueue(topic, item[0], i);
                     info.getMessageQueueList().add(mq);
                 }
             }
-
+            // 通过orderTopicConf创建TopicRoute
+            // 如果一个Broker掉线，那么此时队列总数是否会发化？
+            // 如果发生变化，那么同一个 ShardingKey 的消息就会发送到不同的队列上，造成乱序。如果不发生变化，那消息将会发送到掉线Broker的队列上，必然是失败的。
+            // 因此提供了两种模式，如果要保证严格顺序而不是可用性，
+            // 创建 Topic 是要指定 -o 参数（--order）为true，表示顺序消息。
+            // 所以这里的Topic路由信息是不会随着Broker的掉线而发生变化.
+            // https://rocketmq.apache.org/zh/docs/4.x/producer/03message2/
             info.setOrderTopic(true);
         } else if (route.getOrderTopicConf() == null
             && route.getTopicQueueMappingByBroker() != null

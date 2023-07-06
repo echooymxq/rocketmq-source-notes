@@ -105,8 +105,11 @@ public class DefaultPullMessageResultHandler implements PullMessageResultHandler
             response = rewriteResult;
         }
 
+        // 如果是广播消费
         processor.updateBroadcastPulledOffset(requestHeader.getTopic(), requestHeader.getConsumerGroup(),
             requestHeader.getQueueId(), requestHeader, channel, response, getMessageResult.getNextBeginOffset());
+
+        // 更新消费拉取位点
         processor.tryCommitOffset(brokerAllowSuspend, requestHeader, getMessageResult.getNextBeginOffset(),
             clientAddress);
 

@@ -35,10 +35,12 @@ public class TransactionalMessageUtil {
     public static final String TRANSACTION_ID = "__transactionId__";
 
     public static String buildOpTopic() {
+        // 当消息服务器收到事务消息的提交或回滚请求后，会将消息存储在该主题下
         return TopicValidator.RMQ_SYS_TRANS_OP_HALF_TOPIC;
     }
 
     public static String buildHalfTopic() {
+        // 事务消息首先先进入到该主题
         return TopicValidator.RMQ_SYS_TRANS_HALF_TOPIC;
     }
 

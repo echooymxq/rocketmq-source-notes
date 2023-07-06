@@ -81,20 +81,26 @@ public class ReceiveMessageActivity extends AbstractMessingActivity {
             int maxAttempts = settings.getBackoffPolicy().getMaxAttempts();
             ProxyConfig config = ConfigurationManager.getProxyConfig();
 
+            // 客户端请求超时时间，默认为长轮询时间 + 3S
             Long timeRemaining = ctx.getRemainingMs();
             long pollingTime;
+            // 如果客户端设置了awaitDuration，即长轮询时间
             if (request.hasLongPollingTimeout()) {
                 pollingTime = Durations.toMillis(request.getLongPollingTimeout());
             } else {
+                // settings#requestTimeout为Request timeout for RPCs excluding long-polling，默认也是3S.
                 pollingTime = timeRemaining - Durations.toMillis(settings.getRequestTimeout()) / 2;
             }
+            // gRPC client最小长轮询时间配置，默认为5s
             if (pollingTime < config.getGrpcClientConsumerMinLongPollingTimeoutMillis()) {
                 pollingTime = config.getGrpcClientConsumerMinLongPollingTimeoutMillis();
             }
+            // gRPC client最小长轮询时间配置，默认为20s
             if (pollingTime > config.getGrpcClientConsumerMaxLongPollingTimeoutMillis()) {
                 pollingTime = config.getGrpcClientConsumerMaxLongPollingTimeoutMillis();
             }
 
+            // 如果长轮询时间大于请求超时时间
             if (pollingTime > timeRemaining) {
                 if (timeRemaining >= config.getGrpcClientConsumerMinLongPollingTimeoutMillis()) {
                     pollingTime = timeRemaining;
@@ -142,7 +148,7 @@ public class ReceiveMessageActivity extends AbstractMessingActivity {
                     request.getBatchSize(),
                     actualInvisibleTime,
                     pollingTime,
-                    ConsumeInitMode.MAX,
+                    ConsumeInitMode.MAX, // 默认从最新的位置开始消费，如果是新建的消费组，历史消息将无法消费到。
                     subscriptionData,
                     fifo,
                     new PopMessageResultFilterImpl(maxAttempts),

@@ -78,10 +78,10 @@ public class ClientRequestProcessor implements NettyRequestProcessor {
                 needCheckNamesrvReady.set(false);
             }
 
+            //判断Nameserver启用了orderMessageEnable
             if (this.namesrvController.getNamesrvConfig().isOrderMessageEnable()) {
-                String orderTopicConf =
-                    this.namesrvController.getKvConfigManager().getKVConfig(NamesrvUtil.NAMESPACE_ORDER_TOPIC_CONFIG,
-                        requestHeader.getTopic());
+                // 如果配置打开了，根据namespace和topic名字获取kvConfig配置文件中顺序Topic的配置内容
+                String orderTopicConf = this.namesrvController.getKvConfigManager().getKVConfig(NamesrvUtil.NAMESPACE_ORDER_TOPIC_CONFIG, requestHeader.getTopic());
                 topicRouteData.setOrderTopicConf(orderTopicConf);
             }
 

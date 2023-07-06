@@ -670,6 +670,7 @@ public class ConsumeQueue implements ConsumeQueueInterface, FileQueueLifeCycle {
 
     @Override
     public long getMinOffsetInQueue() {
+        // 获取ConsumeQueue最小Offset
         return this.minLogicOffset / CQ_STORE_UNIT_SIZE;
     }
 

@@ -316,6 +316,9 @@ public class DefaultMessageStore implements MessageStore {
         boolean result = true;
 
         try {
+            // 用abort文件表示RocketMQ是正常退出还是异常退出
+            // 该文件在MessageStore#start时创建
+            // 在MessageStore#shutdown时删除，如果是正常退出，就该文件不存在
             boolean lastExitOK = !this.isTempFileExist();
             LOGGER.info("last shutdown {}, store path root dir: {}",
                 lastExitOK ? "normally" : "abnormally", messageStoreConfig.getStorePathRootDir());
@@ -1821,6 +1824,7 @@ public class DefaultMessageStore implements MessageStore {
             public void run() {
                 DefaultMessageStore.this.cleanQueueFilesPeriodically();
             }
+            // 每隔10s执行删除
         }, 1000 * 60, this.messageStoreConfig.getCleanResourceInterval(), TimeUnit.MILLISECONDS);
 
 
@@ -2207,8 +2211,8 @@ public class DefaultMessageStore implements MessageStore {
 
         public void run() {
             try {
-//                this.deleteExpiredFiles();
-//                this.reDeleteHangedFile();
+                this.deleteExpiredFiles();
+                this.reDeleteHangedFile();
             } catch (Throwable e) {
                 DefaultMessageStore.LOGGER.warn(this.getServiceName() + " service has exception. ", e);
             }
@@ -2454,6 +2458,7 @@ public class DefaultMessageStore implements MessageStore {
 
                 for (ConcurrentMap<Integer, ConsumeQueueInterface> maps : tables.values()) {
                     for (ConsumeQueueInterface logic : maps.values()) {
+                        // 根据CommitLog的最小offset删除consumeQueue
                         int deleteCount = DefaultMessageStore.this.consumeQueueStore.deleteExpiredFile(logic, minOffset);
                         if (deleteCount > 0 && deleteLogicsFilesInterval > 0) {
                             try {

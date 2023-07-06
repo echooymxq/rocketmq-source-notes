@@ -86,6 +86,7 @@ public class ProducerProcessor extends AbstractProcessor {
                 throw new ProxyException(ProxyExceptionCode.FORBIDDEN, "no writable queue");
             }
 
+            // 发送消息时，如果该消息ID为空，则设置默认值
             for (Message msg : messageList) {
                 MessageClientIDSetter.setUniqID(msg);
             }

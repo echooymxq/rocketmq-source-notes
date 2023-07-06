@@ -42,12 +42,14 @@ public class ConsumerOffsetManager extends ConfigManager {
 
     private DataVersion dataVersion = new DataVersion();
 
+    // 已提交的消费进度
     private ConcurrentMap<String/* topic@group */, ConcurrentMap<Integer, Long>> offsetTable =
         new ConcurrentHashMap<>(512);
 
     private final ConcurrentMap<String, ConcurrentMap<Integer, Long>> resetOffsetTable =
         new ConcurrentHashMap<>(512);
 
+    // 当前Pull位置的进度
     private final ConcurrentMap<String/* topic@group */, ConcurrentMap<Integer, Long>> pullOffsetTable =
         new ConcurrentHashMap<>(512);
 
@@ -387,7 +389,7 @@ public class ConsumerOffsetManager extends ConfigManager {
         String key = topic + TOPIC_GROUP_SEPARATOR + group;
         ConcurrentMap<Integer, Long> map = resetOffsetTable.get(key);
         if (null == map) {
-            map = new ConcurrentHashMap<Integer, Long>();
+            map = new ConcurrentHashMap<>();
             ConcurrentMap<Integer, Long> previous = resetOffsetTable.putIfAbsent(key, map);
             if (null != previous) {
                 map = previous;

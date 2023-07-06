@@ -70,6 +70,7 @@ public class BrokerConfig extends BrokerIdentity {
     private int putMessageFutureThreadPoolNums = Math.min(PROCESSOR_NUMBER, 4);
     private int pullMessageThreadPoolNums = 16 + PROCESSOR_NUMBER * 2;
     private int litePullMessageThreadPoolNums = 16 + PROCESSOR_NUMBER * 2;
+    // Ack线程池数量
     private int ackMessageThreadPoolNums = 3;
     private int processReplyMessageThreadPoolNums = 16 + PROCESSOR_NUMBER * 2;
     private int queryMessageThreadPoolNums = 8 + PROCESSOR_NUMBER;
@@ -77,6 +78,7 @@ public class BrokerConfig extends BrokerIdentity {
     private int adminBrokerThreadPoolNums = 16;
     private int clientManageThreadPoolNums = 32;
     private int consumerManageThreadPoolNums = 32;
+    // loadBalance线程数量
     private int loadBalanceProcessorThreadPoolNums = 32;
     private int heartbeatThreadPoolNums = Math.min(32, PROCESSOR_NUMBER);
     private int recoverThreadPoolNums = 32;
@@ -112,6 +114,7 @@ public class BrokerConfig extends BrokerIdentity {
     private int heartbeatThreadPoolQueueCapacity = 50000;
     private int endTransactionPoolQueueCapacity = 100000;
     private int adminBrokerThreadPoolQueueCapacity = 10000;
+    // LoadBalance 线程池容量大小
     private int loadBalanceThreadPoolQueueCapacity = 100000;
 
     private boolean longPollingEnable = true;
@@ -196,23 +199,29 @@ public class BrokerConfig extends BrokerIdentity {
      */
     private long brokerNotActiveTimeoutMillis = 10 * 1000;
 
+    // 是否网络流控
     private boolean enableNetWorkFlowControl = false;
 
+    // 服务端存储广播消费的消费位点
     private boolean enableBroadcastOffsetStore = true;
 
     private long broadcastOffsetExpireSecond = 2 * 60;
 
     private long broadcastOffsetExpireMaxSecond = 5 * 60;
 
+    // 服务端POP长轮询大小
     private int popPollingSize = 1024;
     private int popPollingMapSize = 100000;
     // 20w cost 200M heap memory.
     private long maxPopPollingSize = 100000;
+    // ReviveTopic队列数
     private int reviveQueueNum = 8;
     private long reviveInterval = 1000;
     private long reviveMaxSlow = 3;
     private long reviveScanTime = 10000;
+    // 是否允许忽略慢ACK的
     private boolean enableSkipLongAwaitingAck = false;
+    // ACK等待时间
     private long reviveAckWaitMs = TimeUnit.MINUTES.toMillis(3);
     private boolean enablePopLog = false;
     private boolean enablePopBufferMerge = false;
@@ -257,6 +266,7 @@ public class BrokerConfig extends BrokerIdentity {
      * The maximum number of times the message was checked, if exceed this value, this message will be discarded.
      */
     @ImportantField
+    // 事务回查的最大次数
     private int transactionCheckMax = 15;
 
     /**

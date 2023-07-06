@@ -74,6 +74,8 @@ public class TopicPublishInfo {
                 int index = this.sendWhichQueue.incrementAndGet();
                 int pos = index % this.messageQueueList.size();
                 MessageQueue mq = this.messageQueueList.get(pos);
+                // 这里通常是在多个broker的情况下，如果上一个broker调用请求失败，将会请求到下一个Broker
+                // 防止在同一个broker上多次失败
                 if (!mq.getBrokerName().equals(lastBrokerName)) {
                     return mq;
                 }

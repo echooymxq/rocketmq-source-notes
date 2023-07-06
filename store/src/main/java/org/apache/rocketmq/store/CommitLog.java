@@ -636,8 +636,11 @@ public class CommitLog implements Swappable {
             // Looking beginning to recover from which file
             int index = mappedFiles.size() - 1;
             MappedFile mappedFile = null;
+            // 从最后一个文件开始找
             for (; index >= 0; index--) {
                 mappedFile = mappedFiles.get(index);
+                // 检查是否可以从该文件恢复
+                // 判断逻辑，
                 if (this.isMappedFileMatchedRecover(mappedFile)) {
                     log.info("recover from this mapped file " + mappedFile.getFileName());
                     break;
@@ -766,6 +769,7 @@ public class CommitLog implements Swappable {
         int sysFlag = byteBuffer.getInt(MessageDecoder.SYSFLAG_POSITION);
         int bornhostLength = (sysFlag & MessageSysFlag.BORNHOST_V6_FLAG) == 0 ? 8 : 20;
         int msgStoreTimePos = 4 + 4 + 4 + 4 + 4 + 8 + 8 + 4 + 8 + bornhostLength;
+        // 此MapFile 存储的第一条消息的存储时间
         long storeTimestamp = byteBuffer.getLong(msgStoreTimePos);
         if (0 == storeTimestamp) {
             return false;
@@ -780,6 +784,8 @@ public class CommitLog implements Swappable {
                 return true;
             }
         } else {
+            // 默认走这里的逻辑
+            // 取CommitLog和ConsumeQueue刷盘其中较小的时间
             if (storeTimestamp <= this.defaultMessageStore.getStoreCheckpoint().getMinTimestamp()) {
                 log.info("find check timestamp, {} {}",
                     storeTimestamp,
@@ -1248,6 +1254,7 @@ public class CommitLog implements Swappable {
         return -1;
     }
 
+    // MinOffset始终取commitLog的第一个文件的起始位置
     public long getMinOffset() {
         MappedFile mappedFile = this.mappedFileQueue.getFirstMappedFile();
         if (mappedFile != null) {

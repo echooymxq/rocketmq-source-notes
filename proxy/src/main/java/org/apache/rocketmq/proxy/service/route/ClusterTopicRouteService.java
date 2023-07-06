@@ -52,6 +52,11 @@ public class ClusterTopicRouteService extends TopicRouteService {
             }
             proxyTopicRouteData.getBrokerDatas().add(proxyBrokerData);
         }
+        if (topicName.equals("TopicTest")) {
+            System.out.println();
+        }
+
+        System.out.printf("Topic[%s] 队列:[%s]%n", topicName, proxyTopicRouteData.getQueueDatas());
 
         return proxyTopicRouteData;
     }

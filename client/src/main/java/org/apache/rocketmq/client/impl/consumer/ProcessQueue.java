@@ -86,7 +86,9 @@ public class ProcessQueue {
                 this.treeMapLock.readLock().lockInterruptibly();
                 try {
                     if (!msgTreeMap.isEmpty()) {
+                        // 此条消息消费开始的时间
                         String consumeStartTimeStamp = MessageAccessor.getConsumeStartTimeStamp(msgTreeMap.firstEntry().getValue());
+                        // 如果消息消费耗时超过15分钟，触发sendBack操作
                         if (StringUtils.isNotEmpty(consumeStartTimeStamp) && System.currentTimeMillis() - Long.parseLong(consumeStartTimeStamp) > pushConsumer.getConsumeTimeout() * 60 * 1000) {
                             msg = msgTreeMap.firstEntry().getValue();
                         }

@@ -173,6 +173,7 @@ public class DefaultMQPushConsumer extends ClientConfig implements MQPushConsume
     /**
      * Concurrently max span offset.it has no effect on sequential consumption
      */
+    // 单队列并行消费位点允许的最大跨度，默认值：2000，允许区间为[1,65535]
     private int consumeConcurrentlyMaxSpan = 2000;
 
     /**
@@ -263,6 +264,7 @@ public class DefaultMQPushConsumer extends ClientConfig implements MQPushConsume
     /**
      * Maximum amount of time in minutes a message may block the consuming thread.
      */
+    // 设置最大的消费超时时间
     private long consumeTimeout = 15;
 
     /**

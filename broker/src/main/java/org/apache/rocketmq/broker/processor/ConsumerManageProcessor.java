@@ -185,6 +185,7 @@ public class ConsumerManageProcessor implements NettyRequestProcessor {
         ConsumerOffsetManager consumerOffsetManager = brokerController.getConsumerOffsetManager();
         if (this.brokerController.getBrokerConfig().isUseServerSideResetOffset()) {
             // Note, ignoring this update offset request
+            // 如果服务端正在重置Offset，则此次更新消费进度offset忽略
             if (consumerOffsetManager.hasOffsetReset(topic, group, queueId)) {
                 response.setCode(ResponseCode.SUCCESS);
                 response.setRemark("Offset has been previously reset");

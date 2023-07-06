@@ -125,6 +125,7 @@ public class Broker2Client {
             mq.setTopic(topic);
             mq.setQueueId(i);
 
+            // 当前消费组已经提交的队列消费offset
             long consumerOffset =
                 this.brokerController.getConsumerOffsetManager().queryOffset(group, topic, i);
             if (-1 == consumerOffset) {
@@ -135,9 +136,10 @@ public class Broker2Client {
 
             long timeStampOffset;
             if (timeStamp == -1) {
-
+                // 当前队列最大可消费的offset
                 timeStampOffset = this.brokerController.getMessageStore().getMaxOffsetInQueue(topic, i);
             } else {
+                // 根据时间戳查询对应的消费offset
                 timeStampOffset = this.brokerController.getMessageStore().getOffsetInQueueByTime(topic, i, timeStamp);
             }
 

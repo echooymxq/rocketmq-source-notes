@@ -254,6 +254,7 @@ public class AsyncTraceDispatcher implements TraceDispatcher {
             while (!stopped) {
                 synchronized (traceContextQueue) {
                     long endTime = System.currentTimeMillis() + pollingTimeMil;
+                    // 100ms
                     while (System.currentTimeMillis() < endTime) {
                         try {
                             TraceContext traceContext = traceContextQueue.poll(
@@ -261,7 +262,7 @@ public class AsyncTraceDispatcher implements TraceDispatcher {
                             );
 
                             if (traceContext != null && !traceContext.getTraceBeans().isEmpty()) {
-                                // get the topic which the trace message will send to
+                                // 消息轨迹发送到哪个Topic
                                 String traceTopicName = this.getTraceTopicName(traceContext.getRegionId());
 
                                 // get the traceDataSegment which will save this trace message, create if null
@@ -274,6 +275,9 @@ public class AsyncTraceDispatcher implements TraceDispatcher {
                                 // encode traceContext and save it into traceDataSegment
                                 // NOTE if data size in traceDataSegment more than maxMsgSize,
                                 //  a AsyncDataSendTask will be created and submitted
+                                // traceContext有三种，一个是Pub表示生产消息
+                                // SubBefore 消费前的数据
+                                // SubAfter 消费后的数据
                                 TraceTransferBean traceTransferBean = TraceDataEncoder.encoderFromContextBean(traceContext);
                                 traceDataSegment.addTraceTransferBean(traceTransferBean);
                             }
@@ -319,7 +323,7 @@ public class AsyncTraceDispatcher implements TraceDispatcher {
         private int currentMsgKeySize;
         private final String traceTopicName;
         private final String regionId;
-        private final List<TraceTransferBean> traceTransferBeanList = new ArrayList();
+        private final List<TraceTransferBean> traceTransferBeanList = new ArrayList<>();
 
         TraceDataSegment(String traceTopicName, String regionId) {
             this.traceTopicName = traceTopicName;
@@ -333,8 +337,10 @@ public class AsyncTraceDispatcher implements TraceDispatcher {
 
             this.currentMsgKeySize = traceTransferBean.getTransKey().stream()
                 .reduce(currentMsgKeySize, (acc, x) -> acc + x.length(), Integer::sum);
+            // 128K
+            //
             if (currentMsgSize >= traceProducer.getMaxMessageSize() - 10 * 1000 || currentMsgKeySize >= MAX_MSG_KEY_SIZE) {
-                List<TraceTransferBean> dataToSend = new ArrayList(traceTransferBeanList);
+                List<TraceTransferBean> dataToSend = new ArrayList<>(traceTransferBeanList);
                 AsyncDataSendTask asyncDataSendTask = new AsyncDataSendTask(traceTopicName, regionId, dataToSend);
                 traceExecutor.submit(asyncDataSendTask);
                 this.clear();
@@ -345,7 +351,7 @@ public class AsyncTraceDispatcher implements TraceDispatcher {
             if (this.traceTransferBeanList.isEmpty()) {
                 return;
             }
-            List<TraceTransferBean> dataToSend = new ArrayList(traceTransferBeanList);
+            List<TraceTransferBean> dataToSend = new ArrayList<>(traceTransferBeanList);
             AsyncDataSendTask asyncDataSendTask = new AsyncDataSendTask(traceTopicName, regionId, dataToSend);
             traceExecutor.submit(asyncDataSendTask);
 
@@ -381,6 +387,9 @@ public class AsyncTraceDispatcher implements TraceDispatcher {
         public void run() {
             StringBuilder buffer = new StringBuilder(1024);
             Set<String> keySet = new HashSet<>();
+            // 每个Producer或者Consumer都会有个Dispatcher实例
+            // 对于Producer而言，同一个Topic，不同消息可能会生成一条轨迹消息来存储
+            // 对于Consumer而言，同一个Topic，同一个消费组的不同消息可能会生成一条轨迹消息来存储。
             for (TraceTransferBean bean : traceTransferBeanList) {
                 keySet.addAll(bean.getTransKey());
                 buffer.append(bean.getTransData());

@@ -154,6 +154,8 @@ public class ExtraInfoUtil {
             stringBuilder.append(";");
         }
 
+        // 0 0 0
+        // 重试或普通Topic ｜ 队列ID ｜ 消费次数
         stringBuilder.append(retry ? RETRY_TOPIC : NORMAL_TOPIC)
                 .append(MessageConst.KEY_SEPARATOR).append(queueId)
                 .append(MessageConst.KEY_SEPARATOR).append(orderCount);

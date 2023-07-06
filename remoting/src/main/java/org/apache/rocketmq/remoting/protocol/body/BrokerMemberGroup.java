@@ -33,6 +33,13 @@ public class BrokerMemberGroup extends RemotingSerializable {
         this.brokerAddrs = new HashMap<>();
     }
 
+    public static void main(String[] args) {
+        BrokerMemberGroup group = new BrokerMemberGroup();
+        group.getBrokerAddrs().put(1L, "127.0.0.1:10912");
+        byte[] encode = group.encode();
+        System.out.println(new String(encode));
+    }
+
     public BrokerMemberGroup(final String cluster, final String brokerName) {
         this.cluster = cluster;
         this.brokerName = brokerName;

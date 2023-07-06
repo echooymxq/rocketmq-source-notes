@@ -211,6 +211,7 @@ public class AckMessageProcessor implements NettyRequestProcessor {
                             qId, ackOffset,
                             popTime);
                     if (nextOffset > -1) {
+                        // 如果当前正在重置消费位点，则不提交Offset
                         if (!this.brokerController.getConsumerOffsetManager().hasOffsetReset(
                                 topic, consumeGroup, qId)) {
                             this.brokerController.getConsumerOffsetManager().commitOffset(channel.remoteAddress().toString(),
@@ -287,6 +288,7 @@ public class AckMessageProcessor implements NettyRequestProcessor {
         ackMsg.setBrokerName(brokerName);
         // 先尝试放入内存匹配，如果成功则直接返回。失败可能是内存匹配未开启
         if (this.brokerController.getPopMessageProcessor().getPopBufferMergeService().addAk(rqId, ackMsg)) {
+            //ACK 成功时，统计POP未ACK的消息指标
             brokerController.getPopInflightMessageCounter().decrementInFlightMessageNum(topic, consumeGroup, popTime, qId, ackCount);
             return;
         }
@@ -319,6 +321,7 @@ public class AckMessageProcessor implements NettyRequestProcessor {
         }
         System.out.printf("put ack to store %s", ackMsg);
         PopMetricsManager.incPopReviveAckPutCount(ackMsg, putMessageResult.getPutMessageStatus());
+        // ACK的消息落盘之后，统计POP消息未ACK的指标
         brokerController.getPopInflightMessageCounter().decrementInFlightMessageNum(topic, consumeGroup, popTime, qId, ackCount);
     }
 }

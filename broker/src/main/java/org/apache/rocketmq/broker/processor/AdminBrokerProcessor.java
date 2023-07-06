@@ -1804,6 +1804,7 @@ public class AdminBrokerProcessor implements NettyRequestProcessor {
             RemotingHelper.parseChannelRemoteAddr(ctx.channel()), requestHeader.getTopic(), requestHeader.getGroup(),
             requestHeader.getTimestamp(), requestHeader.isForce());
 
+        // 如果Broker启用了服务端重置消费位点
         if (this.brokerController.getBrokerConfig().isUseServerSideResetOffset()) {
             String topic = requestHeader.getTopic();
             String group = requestHeader.getGroup();
@@ -1820,6 +1821,7 @@ public class AdminBrokerProcessor implements NettyRequestProcessor {
                 isC = true;
                 break;
         }
+        // Broker请求调用客户端重置offset
         return this.brokerController.getBroker2Client().resetOffset(requestHeader.getTopic(), requestHeader.getGroup(),
             requestHeader.getTimestamp(), requestHeader.isForce(), isC);
     }
@@ -1871,8 +1873,10 @@ public class AdminBrokerProcessor implements NettyRequestProcessor {
             return response;
         }
 
+        // 如果重置指定队列的消费位点
         if (queueId >= 0) {
             if (null != offset && -1 != offset) {
+                // 如果指定了重置位点offset，则需判断当前offset是否合法
                 long min = brokerController.getMessageStore().getMinOffsetInQueue(topic, queueId);
                 long max = brokerController.getMessageStore().getMaxOffsetInQueue(topic, queueId);
                 if (min >= 0 && offset < min || offset > max + 1) {
@@ -1882,10 +1886,12 @@ public class AdminBrokerProcessor implements NettyRequestProcessor {
                     return response;
                 }
             } else {
+                // 根据时间戳查找重置位点offset
                 offset = searchOffsetByTimestamp(topic, queueId, timestamp);
             }
             queueOffsetMap.put(queueId, offset);
         } else {
+            // 重置每个队列的消费位点
             for (int index = 0; index < topicConfig.getReadQueueNums(); index++) {
                 offset = searchOffsetByTimestamp(topic, index, timestamp);
                 queueOffsetMap.put(index, offset);

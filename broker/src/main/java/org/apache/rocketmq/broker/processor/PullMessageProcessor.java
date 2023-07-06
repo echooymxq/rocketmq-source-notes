@@ -517,17 +517,21 @@ public class PullMessageProcessor implements NettyRequestProcessor {
         String topic = requestHeader.getTopic();
         String group = requestHeader.getConsumerGroup();
         int queueId = requestHeader.getQueueId();
+        // 如果当前消费组重置了消费进度offset
         Long resetOffset = brokerController.getConsumerOffsetManager().queryThenEraseResetOffset(topic, group, queueId);
 
         GetMessageResult getMessageResult = null;
+        // 是否允许服务端重置Offset
         if (useResetOffsetFeature && null != resetOffset) {
             getMessageResult = new GetMessageResult();
             getMessageResult.setStatus(GetMessageStatus.OFFSET_RESET);
+            // 将Pull消息的响应设置为重置offset
             getMessageResult.setNextBeginOffset(resetOffset);
             getMessageResult.setMinOffset(messageStore.getMinOffsetInQueue(topic, queueId));
             getMessageResult.setMaxOffset(messageStore.getMaxOffsetInQueue(topic, queueId));
             getMessageResult.setSuggestPullingFromSlave(false);
         } else {
+            // 查询广播拉取的初始消费位点
             long broadcastInitOffset = queryBroadcastPullInitOffset(topic, group, queueId, requestHeader, channel);
             if (broadcastInitOffset >= 0) {
                 getMessageResult = new GetMessageResult();
@@ -760,6 +764,7 @@ public class PullMessageProcessor implements NettyRequestProcessor {
 
     protected void tryCommitOffset(boolean brokerAllowSuspend, PullMessageRequestHeader requestHeader,
         long nextOffset, String clientAddress) {
+        // 更新当前Pull的Offset
         this.brokerController.getConsumerOffsetManager().commitPullOffset(clientAddress,
             requestHeader.getConsumerGroup(), requestHeader.getTopic(), requestHeader.getQueueId(), nextOffset);
 
@@ -854,14 +859,17 @@ public class PullMessageProcessor implements NettyRequestProcessor {
     protected long queryBroadcastPullInitOffset(String topic, String group, int queueId,
         PullMessageRequestHeader requestHeader, Channel channel) {
 
+        // 是否启用BroadcastOffsetStore
         if (!this.brokerController.getBrokerConfig().isEnableBroadcastOffsetStore()) {
             return -1L;
         }
 
         ConsumerGroupInfo consumerGroupInfo = this.brokerController.getConsumerManager().getConsumerGroupInfo(group);
+        // 是否从Proxy请求的
         boolean proxyPullBroadcast = Objects.equals(
             RequestSource.PROXY_FOR_BROADCAST.getValue(), requestHeader.getRequestSource());
 
+        // 是否为广播消费
         if (isBroadcast(proxyPullBroadcast, consumerGroupInfo)) {
             String clientId;
             if (proxyPullBroadcast) {

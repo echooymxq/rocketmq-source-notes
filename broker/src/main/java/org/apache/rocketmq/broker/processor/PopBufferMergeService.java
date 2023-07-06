@@ -17,10 +17,7 @@
 package org.apache.rocketmq.broker.processor;
 
 import com.alibaba.fastjson.JSON;
-import com.sun.org.apache.bcel.internal.generic.POP;
 import java.nio.charset.StandardCharsets;
-import java.text.SimpleDateFormat;
-import java.util.Date;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
@@ -149,7 +146,8 @@ public class PopBufferMergeService extends ServiceThread {
                     || isCkDone(pointWrapper)
                     || isCkDoneForFinish(pointWrapper) && pointWrapper.isCkStored()
                 ) {
-                    if (commitOffset(pointWrapper)) { // 提交原生Topic队列偏移量
+                    // 提交Topic队列消费位点
+                    if (commitOffset(pointWrapper)) {
                         queue.poll(); // 将CK从内存中移除， CK在内存中一份存在bufffer中，一份存在queue中
                     } else {
                         break;
@@ -290,17 +288,6 @@ public class PopBufferMergeService extends ServiceThread {
                     continue;
                 }
 
-<<<<<<< HEAD
-                // 在内存中移除 CheckPoint 前，把其中已经 Ack 的消息也作为 Ack 消息存入磁盘
-                for (byte i = 0; i < point.getNum(); i++) {
-                    // 遍历 CheckPoint 中消息 bit 码表每一位，检查是否已经 Ack 但是没有存到磁盘里面。
-                    if (DataConverter.getBit(pointWrapper.getBits().get(), i) && !DataConverter.getBit(pointWrapper.getToStoreBits().get(), i)) {
-                        // 将ACK消息放到磁盘中
-                        if (putAckToStore(pointWrapper, i)) {
-                            count++;
-                            // 标记ACK消息存入磁盘
-                            markBitCAS(pointWrapper.getToStoreBits(), i);
-=======
                 if (brokerController.getBrokerConfig().isEnablePopBatchAck()) {
                     List<Byte> indexList = this.batchAckIndexList;
                     try {
@@ -323,15 +310,18 @@ public class PopBufferMergeService extends ServiceThread {
                         indexList.clear();
                     }
                 } else {
+                    // 在内存中移除 CheckPoint 前，把其中已经 Ack 的消息也作为 Ack 消息存入磁盘
                     for (byte i = 0; i < point.getNum(); i++) {
                         // reput buffer ak to store
+                        // 遍历 CheckPoint 中消息 bit 码表每一位，检查是否已经 Ack 但是没有存到磁盘里面。
                         if (DataConverter.getBit(pointWrapper.getBits().get(), i)
                                 && !DataConverter.getBit(pointWrapper.getToStoreBits().get(), i)) {
+                            // 将ACK消息放到磁盘中
                             if (putAckToStore(pointWrapper, i)) {
                                 count++;
+                                // 标记ACK消息存入磁盘
                                 markBitCAS(pointWrapper.getToStoreBits(), i);
                             }
->>>>>>> upstream/develop
                         }
                     }
                 }

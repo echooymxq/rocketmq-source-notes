@@ -88,11 +88,13 @@ public class PopLongPollingService extends ServiceThread {
                     }
                     PopRequest first;
                     do {
+                        // 先从队列中移出来
                         first = popQ.pollFirst();
                         if (first == null) {
                             break;
                         }
                         if (!first.isTimeout()) {
+                            // 如果还没有超时，就再加进去
                             if (popQ.add(first)) {
                                 break;
                             } else {
@@ -158,12 +160,14 @@ public class PopLongPollingService extends ServiceThread {
     }
 
     public boolean notifyMessageArriving(final String topic, final String cid, final int queueId) {
+        // 有长轮询的POP请求
         ConcurrentSkipListSet<PopRequest> remotingCommands = pollingMap.get(KeyBuilder.buildPollingKey(topic, cid, queueId));
         if (remotingCommands == null || remotingCommands.isEmpty()) {
             return false;
         }
         PopRequest popRequest = remotingCommands.pollFirst();
         //clean inactive channel
+        // 如果对应的POP请求的channel不可用了
         while (popRequest != null && !popRequest.getChannel().isActive()) {
             totalPollingNum.decrementAndGet();
             popRequest = remotingCommands.pollFirst();

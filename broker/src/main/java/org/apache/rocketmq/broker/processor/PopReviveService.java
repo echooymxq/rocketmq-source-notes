@@ -566,6 +566,7 @@ public class PopReviveService extends ServiceThread {
             while (inflightReviveRequestMap.size() > 3) {
                 waitForRunning(100);
                 Pair<Long, Boolean> pair = inflightReviveRequestMap.firstEntry().getValue();
+                // 如果第一个CheckPoint没有成功，以及已经超过了30s，则将该CheckPoint直接重新发送到reviveTopic中
                 if (!pair.getObject2() && System.currentTimeMillis() - pair.getObject1() > 1000 * 30) {
                     PopCheckPoint oldCK = inflightReviveRequestMap.firstKey();
                     rePutCK(oldCK, pair);
@@ -654,6 +655,7 @@ public class PopReviveService extends ServiceThread {
                 for (Map.Entry<PopCheckPoint, Pair<Long, Boolean>> entry : inflightReviveRequestMap.entrySet()) {
                     PopCheckPoint oldCK = entry.getKey();
                     Pair<Long, Boolean> pair = entry.getValue();
+                    // 如果发送到重试Topic成功，则可以提交revive Topic的offset
                     if (pair.getObject2()) {
                         brokerController.getConsumerOffsetManager().commitOffset(PopAckConstants.LOCAL_HOST, PopAckConstants.REVIVE_GROUP, reviveTopic, queueId, oldCK.getReviveOffset());
                         inflightReviveRequestMap.remove(oldCK);

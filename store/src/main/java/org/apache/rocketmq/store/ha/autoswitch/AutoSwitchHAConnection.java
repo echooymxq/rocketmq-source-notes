@@ -671,6 +671,8 @@ public class AutoSwitchHAConnection implements HAConnection {
                                         }
                                         this.nextTransferFromWhere = masterOffset;
                                     } else {
+                                        //因为commitLog的过期文件删除，如果从最后一个文件开始同步，虽然主从同步，但是主从数据还是不一致
+                                        // 所以从第一个文件开始同步.
                                         this.nextTransferFromWhere = haService.getDefaultMessageStore().getCommitLog().getMinOffset();
                                     }
                                 } else {

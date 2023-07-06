@@ -520,15 +520,19 @@ public class MappedFileQueue implements Swappable {
         int deleteCount = 0;
         if (null != mfs) {
 
+            // 保留最后一个
             int mfsLength = mfs.length - 1;
 
             for (int i = 0; i < mfsLength; i++) {
                 boolean destroy;
                 MappedFile mappedFile = (MappedFile) mfs[i];
+                // 取map file的最后一个数据
                 SelectMappedBufferResult result = mappedFile.selectMappedBuffer(this.mappedFileSize - unitSize);
                 if (result != null) {
+                    // 前8位表示存储的commitLog的offset
                     long maxOffsetInLogicQueue = result.getByteBuffer().getLong();
                     result.release();
+                    // 如果这个offset小于CommitLog的最小offset，则删除
                     destroy = maxOffsetInLogicQueue < offset;
                     if (destroy) {
                         log.info("physic min offset " + offset + ", logics in current mappedFile max offset "

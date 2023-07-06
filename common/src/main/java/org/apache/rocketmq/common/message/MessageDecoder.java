@@ -524,6 +524,7 @@ public class MessageDecoder {
             int msgIDLength = storehostIPLength + 4 + 8;
             ByteBuffer byteBufferMsgId = ByteBuffer.allocate(msgIDLength);
             String msgId = createMessageId(byteBufferMsgId, msgExt.getStoreHostBytes(), msgExt.getCommitLogOffset());
+            // 这里是offsetMsgId
             msgExt.setMsgId(msgId);
 
             if (isClient) {

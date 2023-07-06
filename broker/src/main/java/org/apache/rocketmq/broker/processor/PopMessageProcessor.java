@@ -18,15 +18,12 @@ package org.apache.rocketmq.broker.processor;
 
 import com.alibaba.fastjson.JSON;
 import com.googlecode.concurrentlinkedhashmap.ConcurrentLinkedHashMap;
-import com.sun.org.apache.bcel.internal.generic.POP;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.FileRegion;
 import io.opentelemetry.api.common.Attributes;
 import java.nio.ByteBuffer;
-import java.text.SimpleDateFormat;
-import java.util.Date;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map.Entry;
@@ -582,6 +579,7 @@ public class PopMessageProcessor implements NettyRequestProcessor {
                     BrokerMetricsManager.throughputOutTotal.add(result.getBufferTotalSize(), attributes);
 
                     if (isOrder) {
+                        // 如果是顺序消息的POP，POP到消息之后，
                         this.brokerController.getConsumerOrderInfoManager().update(requestHeader.getAttemptId(), isRetry, topic,
                             requestHeader.getConsumerGroup(),
                             queueId, popTime, requestHeader.getInvisibleTime(), result.getMessageQueueOffset(),
@@ -642,6 +640,7 @@ public class PopMessageProcessor implements NettyRequestProcessor {
                         }
                     }
                 }
+                // 增加已POP到但是未ACK的消息数量指标
                 this.brokerController.getPopInflightMessageCounter().incrementInFlightMessageNum(
                     topic,
                     requestHeader.getConsumerGroup(),
@@ -682,7 +681,7 @@ public class PopMessageProcessor implements NettyRequestProcessor {
             }
         }
 
-        // 是否检查重置偏移量
+        // 是否检查当前消费组正在重置消费位点
         if (checkResetOffset) {
             Long resetOffset = resetPopOffset(topic, group, queueId);
             if (resetOffset != null) {
@@ -690,7 +689,7 @@ public class PopMessageProcessor implements NettyRequestProcessor {
             }
         }
 
-        // 获取当前POP队列最新的偏移量
+        // 获取当前POP队列最新的偏移量，该Offset表示已经拉取的，但是还没有提交的
         long bufferOffset = this.popBufferMergeService.getLatestOffset(lockKey);
         if (bufferOffset < 0) {
             return offset;
@@ -751,11 +750,13 @@ public class PopMessageProcessor implements NettyRequestProcessor {
 
     private Long resetPopOffset(String topic, String group, int queueId) {
         String lockKey = topic + PopAckConstants.SPLIT + group + PopAckConstants.SPLIT + queueId;
-        Long resetOffset =
-            this.brokerController.getConsumerOffsetManager().queryThenEraseResetOffset(topic, group, queueId);
+        // 查询是否有重置消费位点，若有返回结果，并清除该重置位点
+        Long resetOffset = this.brokerController.getConsumerOffsetManager().queryThenEraseResetOffset(topic, group, queueId);
         if (resetOffset != null) {
             this.brokerController.getConsumerOrderInfoManager().clearBlock(topic, group, queueId);
+            // 清除当前消费组队列未提交的消费偏移量
             this.getPopBufferMergeService().clearOffsetQueue(lockKey);
+            // 重置消费位点时，同时更新消费位点
             this.brokerController.getConsumerOffsetManager()
                 .commitOffset("ResetPopOffset", group, topic, queueId, resetOffset);
         }
@@ -816,7 +817,7 @@ public class PopMessageProcessor implements NettyRequestProcessor {
     }
 
     public class QueueLockManager extends ServiceThread {
-        private final ConcurrentHashMap<String, TimedLock> expiredLocalCache = new ConcurrentHashMap<>(100000);
+        private ConcurrentHashMap<String, TimedLock> expiredLocalCache = new ConcurrentHashMap<>(100000);
 
         public String buildLockKey(String topic, String consumerGroup, int queueId) {
             return topic + PopAckConstants.SPLIT + consumerGroup + PopAckConstants.SPLIT + queueId;
@@ -848,8 +849,8 @@ public class PopMessageProcessor implements NettyRequestProcessor {
         /**
          * is not thread safe, may cause duplicate lock
          *
-         * @param usedExpireMillis the expired time in millisecond
-         * @return total numbers of TimedLock
+         * @param usedExpireMillis
+         * @return
          */
         public int cleanUnusedLock(final long usedExpireMillis) {
             Iterator<Entry<String, TimedLock>> iterator = expiredLocalCache.entrySet().iterator();

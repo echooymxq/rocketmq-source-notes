@@ -89,6 +89,7 @@ public class ClusterMetadataService extends AbstractStartAndShutdown implements 
         try {
             topicConfigAndQueueMapping = topicConfigCache.get(topic);
         } catch (Exception e) {
+            e.printStackTrace();
             return TopicMessageType.UNSPECIFIED;
         }
         if (topicConfigAndQueueMapping.equals(EMPTY_TOPIC_CONFIG)) {

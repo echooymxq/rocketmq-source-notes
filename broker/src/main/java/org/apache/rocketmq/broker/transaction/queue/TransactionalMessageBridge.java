@@ -80,6 +80,7 @@ public class TransactionalMessageBridge {
     }
 
     public long fetchConsumeOffset(MessageQueue mq) {
+        // 查询内部消费组CID_RMQ_SYS_TRANS的消费位点
         long offset = brokerController.getConsumerOffsetManager().queryOffset(TransactionalMessageUtil.buildConsumerGroup(),
             mq.getTopic(), mq.getQueueId());
         if (offset == -1) {
@@ -216,6 +217,7 @@ public class TransactionalMessageBridge {
         return store.asyncPutMessage(parseHalfMessageInner(messageInner));
     }
 
+    // 解析半事务消息
     private MessageExtBrokerInner parseHalfMessageInner(MessageExtBrokerInner msgInner) {
         String uniqId = msgInner.getUserProperty(MessageConst.PROPERTY_UNIQ_CLIENT_MESSAGE_ID_KEYIDX);
         if (uniqId != null && !uniqId.isEmpty()) {
@@ -226,7 +228,9 @@ public class TransactionalMessageBridge {
             String.valueOf(msgInner.getQueueId()));
         msgInner.setSysFlag(
             MessageSysFlag.resetTransactionValue(msgInner.getSysFlag(), MessageSysFlag.TRANSACTION_NOT_TYPE));
+        // 将半事务消息Topic替换为RMQ_SYS_TRANS_HALF_TOPIC
         msgInner.setTopic(TransactionalMessageUtil.buildHalfTopic());
+        // 事务消息的队列数只有1
         msgInner.setQueueId(0);
         msgInner.setPropertiesString(MessageDecoder.messageProperties2String(msgInner.getProperties()));
         return msgInner;

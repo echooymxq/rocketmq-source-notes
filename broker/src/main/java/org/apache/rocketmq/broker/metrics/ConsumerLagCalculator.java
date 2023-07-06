@@ -200,6 +200,7 @@ public class ConsumerLagCalculator {
 
             CalculateLagResult result = new CalculateLagResult(info.group, info.topic, false);
 
+            // 获取消费差距指标
             Pair<Long, Long> lag = getConsumerLagStats(info.group, info.topic, info.isPop);
             if (lag != null) {
                 result.lag = lag.getObject1();
@@ -219,6 +220,7 @@ public class ConsumerLagCalculator {
             }
         });
     }
+
 
     public void calculateInflight(Consumer<CalculateInflightResult> inflightRecorder) {
         processAllGroup(info -> {
@@ -286,13 +288,16 @@ public class ConsumerLagCalculator {
         return new Pair<>(total, earliestUnconsumedTimestamp);
     }
 
+    // 计算消费差距指标
     public Pair<Long, Long> getConsumerLagStats(String group, String topic, int queueId, boolean isPop) {
+        // 获取当前队列的可消费offset
         long brokerOffset = messageStore.getMaxOffsetInQueue(topic, queueId);
         if (brokerOffset < 0) {
             brokerOffset = 0;
         }
 
         if (isPop) {
+            // 获取当前POP消费拉取消息的offset
             long pullOffset = popBufferMergeService.getLatestOffset(topic, group, queueId);
             if (pullOffset < 0) {
                 pullOffset = offsetManager.queryOffset(group, topic, queueId);
@@ -301,22 +306,27 @@ public class ConsumerLagCalculator {
                 pullOffset = brokerOffset;
             }
             long inFlightNum = popInflightMessageCounter.getGroupPopInFlightMessageNum(topic, group, queueId);
+            // 消费差距为BrokerOffset - POP的位点 + POP到未提交的消息数量
+            // 等价于未POP的消息 + 已POP但未提交的消息
             long lag = calculateMessageCount(group, topic, queueId, pullOffset, brokerOffset) + inFlightNum;
             long consumerOffset = pullOffset - inFlightNum;
             long consumerStoreTimeStamp = getStoreTimeStamp(topic, queueId, consumerOffset);
             return new Pair<>(lag, consumerStoreTimeStamp);
         }
 
+        // 如果是PULL消费模式
         long consumerOffset = offsetManager.queryOffset(group, topic, queueId);
         if (consumerOffset < 0) {
             consumerOffset = brokerOffset;
         }
 
+        // 消费差距为队列Offset - 已提交的Offset
         long lag = calculateMessageCount(group, topic, queueId, consumerOffset, brokerOffset);
         long consumerStoreTimeStamp = getStoreTimeStamp(topic, queueId, consumerOffset);
         return new Pair<>(lag, consumerStoreTimeStamp);
     }
 
+    // 计算Topic总的正在消费的消息指标
     public Pair<Long, Long> getInFlightMsgStats(String group, String topic, boolean isPop) {
         long total = 0L;
         long earliestUnPulledTimestamp = Long.MAX_VALUE;
@@ -343,8 +353,10 @@ public class ConsumerLagCalculator {
         return new Pair<>(total, earliestUnPulledTimestamp);
     }
 
+    // 计算正在消费的消息指标
     public Pair<Long, Long> getInFlightMsgStats(String group, String topic, int queueId, boolean isPop) {
         if (isPop) {
+            //
             long inflight = popInflightMessageCounter.getGroupPopInFlightMessageNum(topic, group, queueId);
             long pullOffset = popBufferMergeService.getLatestOffset(topic, group, queueId);
             if (pullOffset < 0) {
@@ -367,6 +379,7 @@ public class ConsumerLagCalculator {
             commitOffset = pullOffset;
         }
 
+        // 如果是PULL消费模式，正在消费的消息数量为，当前Pull的消费位点-已提交的队列offset位点
         long inflight = calculateMessageCount(group, topic, queueId, commitOffset, pullOffset);
         long pullStoreTimeStamp = getStoreTimeStamp(topic, queueId, pullOffset);
         return new Pair<>(inflight, pullStoreTimeStamp);
@@ -391,6 +404,7 @@ public class ConsumerLagCalculator {
         return total;
     }
 
+    // 计算当前可消费的消息数量
     public long getAvailableMsgCount(String group, String topic, int queueId, boolean isPop) {
         long brokerOffset = messageStore.getMaxOffsetInQueue(topic, queueId);
         if (brokerOffset < 0) {
@@ -413,6 +427,7 @@ public class ConsumerLagCalculator {
             pullOffset = brokerOffset;
         }
 
+        // 如果是PULL模式，当前可消费的消息数量为队列Offset-Pull的位点
         return calculateMessageCount(group, topic, queueId, pullOffset, brokerOffset);
     }
 

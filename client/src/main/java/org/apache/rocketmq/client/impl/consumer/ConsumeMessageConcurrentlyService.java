@@ -82,12 +82,15 @@ public class ConsumeMessageConcurrentlyService implements ConsumeMessageService 
         this.cleanExpireMsgExecutors = Executors.newSingleThreadScheduledExecutor(new ThreadFactoryImpl("CleanExpireMsgScheduledThread_" + consumerGroupTag));
     }
 
+    // 用于清理长时间消费卡住的问题
     public void start() {
         this.cleanExpireMsgExecutors.scheduleAtFixedRate(new Runnable() {
 
             @Override
             public void run() {
                 try {
+                    // 1. 消费timeout的时间可能不精确。由于扫描的间隔是15分钟，所以实际上触发的时候，消息是有可能卡住了接近30分钟（15*2）才被清理
+                    // 2. 定时器一启动就开始调度了，中途这个consumeTimeout再更新也不会生效
                     cleanExpireMsg();
                 } catch (Throwable e) {
                     log.error("scheduleAtFixedRate cleanExpireMsg exception", e);
@@ -307,7 +310,9 @@ public class ConsumeMessageConcurrentlyService implements ConsumeMessageService 
                 break;
         }
 
+        // 将消息从本地缓存中删除
         long offset = consumeRequest.getProcessQueue().removeMessage(consumeRequest.getMsgs());
+
         if (offset >= 0 && !consumeRequest.getProcessQueue().isDropped()) {
             // 更新消费进度，不管消费成功与否，都会修改偏移量，失败的会进行重试创建新的消息的。
             this.defaultMQPushConsumerImpl.getOffsetStore().updateOffset(consumeRequest.getMessageQueue(), offset, true);
@@ -460,6 +465,7 @@ public class ConsumeMessageConcurrentlyService implements ConsumeMessageService 
                 .incConsumeRT(ConsumeMessageConcurrentlyService.this.consumerGroup, messageQueue.getTopic(), consumeRT);
 
             if (!processQueue.isDropped()) {
+                // 处理消费结果
                 ConsumeMessageConcurrentlyService.this.processConsumeResult(status, context, this);
             } else {
                 log.warn("processQueue is dropped without process consume result. messageQueue={}, msgs={}", messageQueue, msgs);

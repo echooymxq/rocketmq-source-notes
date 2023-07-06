@@ -139,9 +139,11 @@ public class GrpcConverter {
         }
 
         // message_id
+        // 默认是使用uniqKey当作消息ID的
         String uniqKey = messageExt.getProperty(MessageConst.PROPERTY_UNIQ_CLIENT_MESSAGE_ID_KEYIDX);
 
         if (uniqKey == null) {
+            // 如果uniqKey为空，获取offsetMsgId
             uniqKey = messageExt.getMsgId();
         }
 
